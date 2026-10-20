@@ -8,14 +8,6 @@ if (!connectionString) {
   throw new Error('DATABASE_URL is not set — expected a postgres:// connection string.')
 }
 
-// TEMP DIAGNOSTIC — remove once the deployment is confirmed to hit the right database.
-try {
-  const u = new URL(connectionString)
-  console.log(`[diag] DB target: host=${u.hostname} db=${u.pathname} user=${u.username}`)
-} catch {
-  console.log('[diag] DATABASE_URL could not be parsed as a URL')
-}
-
 const pool = new Pool({
   connectionString,
   // Supabase (and most managed Postgres) require TLS; node-postgres doesn't enable it automatically
