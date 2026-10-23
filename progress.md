@@ -2,7 +2,9 @@
 
 Ce fichier sert de mémoire de projet : ce qui existe, comment c'est construit, ce qui reste à faire. À tenir à jour à chaque évolution significative.
 
-Dernière mise à jour : 2026-09-04.
+Dernière mise à jour : 2026-10-23.
+
+**Depuis le 20/10/2026, ce dépôt (`Gescom_demo`) est un fork de `BGM-gestion-commerciale`**, utilisé comme démo commerciale paramétrable pour présenter la solution à des prospects dans d'autres pays (Sénégal, Djibouti...), avec sa propre base Supabase totalement séparée de celle de BGM. Les sections ci-dessous documentent ce qui est **spécifique à ce fork** — pour l'historique commun avant la divergence, voir les sections 1-18.
 
 ## 1. Contexte métier
 
@@ -263,3 +265,35 @@ Vérifié : `tsc` propre, les 19 tests Vitest passent **sans aucune modification
 2. **RLS (Row-Level Security) activé par défaut par Supabase sur toute nouvelle table**, alors que le reste du schéma n'en a pas (l'autorisation est gérée entièrement côté application via better-auth/`isAdmin()`, pas par des policies Postgres) — il faut explicitement `ALTER TABLE ... DISABLE ROW LEVEL SECURITY` sur chaque nouvelle table, sinon tout accès est silencieusement refusé même avec les bons `GRANT`.
 
 Vérifié : `tsc` propre, 25 tests Vitest verts (6 nouveaux pour `cash-accounts`, y compris le test de concurrence), test manuel de bout en bout via `pnpm dev` + `curl` authentifié (création de caisse, enregistrement d'une dépense, solde correctement débité, export CSV fonctionnel) — données de test nettoyées après coup.
+
+## 19. Fork en démo commerciale paramétrable (20-23/10/2026)
+
+**Objectif** : pouvoir re-thématiser l'app en direct devant un prospect (nom d'entreprise, pays, devise, logo, coordonnées de facture) sans toucher au code ni redéployer.
+
+**Table `app_settings`** (ligne unique, `id = 1`) : `companyName`, `companyShortName`, `country`, `currency`, `companyAddress`, `companyPhone`, `companyEmail`, `logoDataUrl`. Page admin **Paramètres** (`/parametres`, `components/settings-view.tsx`) pour les éditer :
+- **Pays** : liste déroulante (Guinée, Sénégal, Côte d'Ivoire, Mali, Burkina Faso, Bénin, Togo, Niger, Djibouti + "Autre") qui **remplit automatiquement la devise** — "FCFA" affiché pour toute la zone UEMOA (volontairement, pas le code ISO "XOF", pour rester lisible par les clients).
+- **Logo** : upload avec redimensionnement côté navigateur (canvas, max 320px) puis stocké en base comme `data:` URL — pas de bucket de stockage à configurer. Servi via une route dédiée `/api/logo` (redirige vers le fichier statique par défaut, ou renvoie l'image décodée depuis la base) plutôt que de faire transiter ~1 Mo de base64 dans le payload de chaque page.
+
+**Propagation dans l'app** — deux mécanismes distincts :
+- **Côté serveur** (API, calculs, `formatFcfa`) : `lib/settings-cache.ts` mute **en place** les objets `businessConfig`/`companyInfo` déjà importés partout dans le code (cache 10s, invalidé immédiatement après un `PATCH /api/parametres`). Corrige au passage un bug préexistant : `"GNF"` était codé en dur dans `formatFcfa`, ignorant totalement `businessConfig.currency`.
+- **Côté client** : `SettingsProvider`/`useSettings()` (contexte React), alimenté par le layout racine à chaque chargement de page.
+
+**Piège sérieux rencontré et corrigé** : après avoir sauvegardé les Paramètres, les changements n'apparaissaient **jamais** dans la sidebar/le titre/les factures, même après plusieurs tentatives. Cause : `next build` avait pré-rendu `/parametres`, `/stock`, `/clients`, etc. en HTML **statique** au moment du déploiement (aucune de ces pages n'utilise d'API Dynamic de Next.js comme `headers()`/`cookies()` dans son propre arbre de rendu serveur) — la base de données était bien mise à jour, mais la coquille statique ne se régénérait jamais pour le refléter. Corrigé en ajoutant `export const dynamic = 'force-dynamic'` à `app/layout.tsx` (et séparément à `app/manifest.ts`, hors de l'arborescence du layout) — force tout l'arbre de pages à être rendu à la demande.
+
+**SKU généré automatiquement** : le champ SKU du formulaire "Nouvel article" est masqué par défaut (lien "Personnaliser le SKU" pour le cas où un code précis est exigé) — `generateUniqueSku()` (`lib/db/mutations/products.ts`) dérive un code court et lisible à partir des deux premiers mots significatifs du nom du produit (ex. "Farine de blé T55 50kg" → `FARBLE-01`), avec un suffixe numérique en cas de collision.
+
+**Facture** : upload logo + adresse/téléphone/e-mail éditables (répercutés sur la facture écran et le PDF), et montant total imprimé en toutes lettres (`lib/number-to-words.ts`, voir section 20 pour le détail — développé ici en premier, puis porté sur BGM).
+
+Vérifié : `tsc` propre, build Next.js propre, 25 tests Vitest verts, test manuel via `pnpm dev`/déploiement réel (upload de logo, changement de pays → devise auto-remplie, rafraîchissement de la sidebar confirmé après le correctif `force-dynamic`).
+
+## 20. Recherche globale et cohérence Caisse & Dépenses (23/10/2026)
+
+Développées ici en premier (voir aussi la version portée sur `BGM-gestion-commerciale`, documentée dans son propre `progress.md` section 20, avec le même contenu fonctionnel) :
+
+**Recherche globale** — l'icône loupe de la barre du haut (décorative jusque-là) ouvre un vrai composant `GlobalSearch` (`components/app-shell.tsx`), anti-rebond 250ms, interrogeant `/api/recherche` (`lib/db/queries/search.ts`) : produits/clients/ventes pour tous, + fournisseurs/magasins pour les admins. Un résultat "vente" ouvre directement sa facture ; les autres renvoient vers leur page de liste avec `?q=` pré-rempli (nécessite un `<Suspense>` autour de `useSearchParams()` sur les pages Stock/Clients/Fournisseurs).
+
+**Caisse & Dépenses déconnectée du reste de l'app — corrigé** : encaisser une vente ou un paiement (client/fournisseur) ne touchait jamais une caisse, obligeant une ressaisie manuelle facilement oubliée. `recordAutoCashMovement()` (`lib/db/mutations/cash-accounts.ts`) enregistre désormais automatiquement le mouvement correspondant. **Choix retenu, volontairement simple** : tout passe par une seule **caisse principale** (`cash_accounts.is_default`), peu importe le mode de paiement — redistribuer vers d'autres caisses se fait ensuite via un **virement manuel** (`transferBetweenCashAccounts()`, atomique). Si aucune caisse n'est configurée, le mouvement est simplement ignoré, jamais bloquant pour la vente/le paiement. Bonus : corrige aussi un bug où le "Total encaissé" d'un client ne comptait jamais les ventes payées comptant (aucune ligne `payments` n'était créée pour ce cas avant ce correctif). Ajout d'un sélecteur de mode de paiement sur le formulaire de vente (jusque-là implicitement toujours "espèces").
+
+**Tables manquantes découvertes en testant** : `cash_accounts`/`cash_movements` n'existaient pas du tout sur la base de ce fork au moment de commencer cette session (la fonctionnalité "Caisse & Dépenses" du code avait été héritée du merge depuis BGM, mais jamais migrée ici) — créées à la main via le SQL Editor Supabase. Idem pour la colonne `is_default`, ajoutée après coup.
+
+Vérifié : `tsc` propre, build Next.js propre, 25 tests Vitest verts, test manuel via `pnpm dev`/déploiement réel.
