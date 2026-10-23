@@ -140,7 +140,6 @@ export async function createSale(input: {
   if (receivedNow > 0) {
     await recordAutoCashMovement({
       direction: 'in',
-      method,
       amount: receivedNow,
       storeId: input.storeId,
       category: 'Vente',

@@ -14,7 +14,6 @@ export async function recordPayment(input: { clientId: number; amount: number; m
 
   await recordAutoCashMovement({
     direction: 'in',
-    method: input.method,
     amount: input.amount,
     storeId: input.storeId,
     category: 'Encaissement client',
@@ -50,7 +49,6 @@ export async function recordSupplierPayment(input: { supplierId: number; amount:
   // type if one exists, else any account of that type — see recordAutoCashMovement.
   await recordAutoCashMovement({
     direction: 'out',
-    method: input.method,
     amount: input.amount,
     category: 'Paiement fournisseur',
   })
