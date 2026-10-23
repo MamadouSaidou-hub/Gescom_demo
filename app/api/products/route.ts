@@ -12,13 +12,13 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   const body = await request.json()
   const name = String(body.name ?? '').trim()
-  const sku = String(body.sku ?? '').trim()
+  const sku = body.sku ? String(body.sku).trim() : undefined
   const category = String(body.category ?? '').trim()
   const unitPrice = Number(body.unitPrice)
   const costPrice = Number(body.costPrice)
   const storeId = Number(body.storeId)
 
-  if (!name || !sku || !category || !Number.isFinite(unitPrice) || !Number.isFinite(costPrice) || !Number.isFinite(storeId)) {
+  if (!name || !category || !Number.isFinite(unitPrice) || !Number.isFinite(costPrice) || !Number.isFinite(storeId)) {
     return NextResponse.json({ error: 'Champs invalides ou manquants.' }, { status: 400 })
   }
 

@@ -52,6 +52,7 @@ function NewProductForm({ storeOptions, onCreated }: { storeOptions: StoreOption
   const { currency } = useSettings()
   const [name, setName] = useState('')
   const [sku, setSku] = useState('')
+  const [customSku, setCustomSku] = useState(false)
   const [category, setCategory] = useState('')
   const [unitPrice, setUnitPrice] = useState('')
   const [costPrice, setCostPrice] = useState('')
@@ -93,10 +94,21 @@ function NewProductForm({ storeOptions, onCreated }: { storeOptions: StoreOption
     <form onSubmit={handleSubmit}>
       {error && <p className="form-error">{error}</p>}
       <div className="form-field"><label>Nom de l’article</label><input required value={name} onChange={(event) => setName(event.target.value)} placeholder="Ex : Riz parfumé 25kg" /></div>
-      <div className="form-row">
-        <div className="form-field"><label>SKU</label><input required value={sku} onChange={(event) => setSku(event.target.value)} placeholder="RIZ-25" /></div>
-        <div className="form-field"><label>Catégorie</label><input required value={category} onChange={(event) => setCategory(event.target.value)} placeholder="Épicerie" /></div>
+      <div className="form-field">
+        <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span>Catégorie</span>
+          <button type="button" className="item-add-link" style={{ fontSize: 11 }} onClick={() => setCustomSku((value) => !value)}>
+            {customSku ? 'Annuler' : 'Personnaliser le SKU'}
+          </button>
+        </label>
+        <input required value={category} onChange={(event) => setCategory(event.target.value)} placeholder="Épicerie" />
       </div>
+      {customSku && (
+        <div className="form-field">
+          <label>SKU</label>
+          <input value={sku} onChange={(event) => setSku(event.target.value)} placeholder="Laisser vide pour un SKU généré automatiquement" />
+        </div>
+      )}
       <div className="form-row">
         <div className="form-field"><label>Prix de vente ({currency})</label><input required type="number" min="0" value={unitPrice} onChange={(event) => setUnitPrice(event.target.value)} /></div>
         <div className="form-field"><label>Prix d’achat ({currency})</label><input required type="number" min="0" value={costPrice} onChange={(event) => setCostPrice(event.target.value)} /></div>

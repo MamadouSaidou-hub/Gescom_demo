@@ -1,11 +1,47 @@
-import { and, eq } from 'drizzle-orm'
+import { and, eq, like } from 'drizzle-orm'
 import { db } from '../client'
 import { products, stockLevels, stockMovements, stores } from '../schema'
 import { getQuantity } from './shared'
 
+const STOPWORDS = new Set(['de', 'du', 'des', 'la', 'le', 'les', 'et', 'en', 'un', 'une', 'au', 'aux'])
+
+function slugify(word: string): string {
+  return word
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '') // strip accents
+    .replace(/[^a-zA-Z0-9]/g, '')
+    .toUpperCase()
+}
+
+/** Derives a short, readable base like "FARBLE" from "Farine de blé T55 50kg" — the first 3
+ * letters of each of the first two meaningful words — then disambiguates with a numeric suffix so
+ * near-identical product names (different sizes of the same item) still get distinct SKUs. */
+export async function generateUniqueSku(name: string): Promise<string> {
+  const words = name
+    .split(/\s+/)
+    .map(slugify)
+    .filter((word) => word.length > 0 && !STOPWORDS.has(word.toLowerCase()))
+
+  const base = (words.slice(0, 2).map((word) => word.slice(0, 3)).join('') || 'ART').slice(0, 10)
+
+  const existing = await db
+    .select({ sku: products.sku })
+    .from(products)
+    .where(like(products.sku, `${base}-%`))
+  const taken = new Set(existing.map((row) => row.sku))
+
+  for (let n = 1; n <= taken.size + 1; n++) {
+    const candidate = `${base}-${String(n).padStart(2, '0')}`
+    if (!taken.has(candidate)) return candidate
+  }
+  // Unreachable in practice (loop covers one more than the number of existing matches), but keeps
+  // the return type honest if it ever is.
+  return `${base}-${Date.now()}`
+}
+
 export async function createProduct(input: {
   name: string
-  sku: string
+  sku?: string
   category: string
   unitPrice: number
   costPrice: number
@@ -14,11 +50,13 @@ export async function createProduct(input: {
   initialQuantity: number
   sackWeightKg?: number | null
 }) {
+  const sku = input.sku?.trim() || (await generateUniqueSku(input.name))
+
   const [product] = await db
     .insert(products)
     .values({
       name: input.name,
-      sku: input.sku,
+      sku,
       category: input.category,
       unitPrice: input.unitPrice,
       costPrice: input.costPrice,
