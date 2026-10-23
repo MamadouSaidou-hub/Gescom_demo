@@ -9,6 +9,14 @@ import { SettingsProvider } from '@/components/settings-provider'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' })
 
+// Without this, Next.js prerenders every page that doesn't itself call a Dynamic API (headers(),
+// cookies()...) as static HTML at build time — which is most pages here, since their data loads
+// client-side via fetch(). That froze the branding (logo, company name, currency) read in this
+// layout to whatever was in the database at the last deploy: saving Paramètres updated the
+// database correctly, but the static shell never re-rendered to pick it up. Forcing the whole tree
+// dynamic makes every request re-read the current settings.
+export const dynamic = 'force-dynamic'
+
 export async function generateMetadata(): Promise<Metadata> {
   await ensureSettingsLoaded()
   return {

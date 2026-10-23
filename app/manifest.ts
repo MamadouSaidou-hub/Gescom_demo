@@ -2,6 +2,10 @@ import type { MetadataRoute } from 'next'
 import { companyInfo } from '@/lib/company-info'
 import { ensureSettingsLoaded } from '@/lib/settings-cache'
 
+// This route lives outside the app/layout.tsx tree, so it needs its own opt-out of static caching
+// — see the comment on `dynamic` in app/layout.tsx for why.
+export const dynamic = 'force-dynamic'
+
 export default async function manifest(): Promise<MetadataRoute.Manifest> {
   await ensureSettingsLoaded()
   return {
