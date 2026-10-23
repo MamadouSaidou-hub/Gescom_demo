@@ -49,7 +49,15 @@ try {
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   await ensureSettingsLoaded()
-  const settings = { companyName: companyInfo.displayName, companyShortName: companyInfo.shortName, country: companyInfo.country, currency: businessConfig.currency }
+  const settings = {
+    companyName: companyInfo.displayName,
+    companyShortName: companyInfo.shortName,
+    country: companyInfo.country,
+    currency: businessConfig.currency,
+    address: companyInfo.address,
+    phone: companyInfo.phone,
+    email: companyInfo.email,
+  }
 
   return (
     <html lang="fr" className={`bg-background ${inter.variable}`}>

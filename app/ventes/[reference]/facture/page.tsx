@@ -2,6 +2,8 @@ import { notFound } from 'next/navigation'
 import { getSaleDetail } from '@/lib/db/queries'
 import { getSessionContext, isAdmin } from '@/lib/session'
 import { companyInfo } from '@/lib/company-info'
+import { businessConfig } from '@/lib/business-config'
+import { amountInWords } from '@/lib/number-to-words'
 import { InvoiceActions } from './invoice-actions'
 
 const statusLabel = { paid: 'Payée', partial: 'Partielle', credit: 'À crédit' }
@@ -31,7 +33,7 @@ export default async function Page({ params }: { params: Promise<{ reference: st
           <div className="invoice-header">
             <div className="invoice-brand">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={companyInfo.logoPath} alt={companyInfo.name} style={{ width: 64, height: 64, objectFit: 'contain', flexShrink: 0 }} />
+              <img src="/api/logo" alt={companyInfo.name} style={{ width: 64, height: 64, objectFit: 'contain', flexShrink: 0 }} />
               <div>
                 <div style={{ fontSize: 17, fontWeight: 800, color: NAVY, letterSpacing: '-.3px' }}>{companyInfo.name}</div>
                 <div style={{ fontSize: 10, color: '#2e9e3f', fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', margin: '2px 0 6px' }}>{companyInfo.tagline}</div>
@@ -104,6 +106,10 @@ export default async function Page({ params }: { params: Promise<{ reference: st
               )}
             </div>
           </div>
+
+          <p style={{ fontSize: 10.5, color: MUTED, fontStyle: 'italic', margin: '10px 0 0' }}>
+            Arrêtée la présente facture à la somme de : <strong style={{ color: NAVY, fontStyle: 'normal' }}>{amountInWords(sale.totalAmount)} {businessConfig.currency}</strong>
+          </p>
         </div>
 
         <div className="invoice-footer" style={{ borderTop: `1px solid ${BORDER}` }}>

@@ -7,7 +7,41 @@ import { AppShell } from '@/components/app-shell'
 import { LoadError } from '@/components/load-error'
 import { fetchJson } from '@/lib/fetch-json'
 
-type AppSettings = { companyName: string; companyShortName: string; country: string; currency: string }
+type AppSettings = {
+  companyName: string
+  companyShortName: string
+  country: string
+  currency: string
+  companyAddress: string | null
+  companyPhone: string | null
+  companyEmail: string | null
+  logoDataUrl: string | null
+}
+
+const MAX_LOGO_DIMENSION = 320
+
+function resizeImageToDataUrl(file: File, maxDim: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onerror = () => reject(new Error('Lecture du fichier impossible.'))
+    reader.onload = () => {
+      const img = new Image()
+      img.onerror = () => reject(new Error('Image invalide.'))
+      img.onload = () => {
+        const scale = Math.min(1, maxDim / Math.max(img.width, img.height))
+        const canvas = document.createElement('canvas')
+        canvas.width = Math.round(img.width * scale)
+        canvas.height = Math.round(img.height * scale)
+        const ctx = canvas.getContext('2d')
+        if (!ctx) return reject(new Error('Rendu impossible.'))
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+        resolve(canvas.toDataURL('image/png'))
+      }
+      img.src = reader.result as string
+    }
+    reader.readAsDataURL(file)
+  })
+}
 
 // FCFA is the common screen label for both the UEMOA (XOF) and CEMAC (XAF) francs — intentionally
 // not the ISO code, per the team's call that "XOF" would confuse clients who only know "FCFA".
@@ -32,6 +66,7 @@ export function SettingsView() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [customCountry, setCustomCountry] = useState(false)
+  const [logoError, setLogoError] = useState('')
 
   useEffect(() => {
     fetchJson<{ settings: AppSettings }>('/api/parametres')
@@ -53,6 +88,23 @@ export function SettingsView() {
     setCustomCountry(false)
     const preset = COUNTRY_OPTIONS.find((option) => option.name === value)
     setForm({ ...form, country: value, currency: preset?.currency ?? form.currency })
+  }
+
+  async function handleLogoChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file || !form) return
+    setLogoError('')
+    if (!file.type.startsWith('image/')) {
+      setLogoError('Le logo doit être une image (PNG, JPG...).')
+      return
+    }
+    try {
+      const dataUrl = await resizeImageToDataUrl(file, MAX_LOGO_DIMENSION)
+      setForm({ ...form, logoDataUrl: dataUrl })
+    } catch {
+      setLogoError('Impossible de lire cette image.')
+    }
   }
 
   async function handleSubmit(event: React.FormEvent) {
@@ -97,6 +149,22 @@ export function SettingsView() {
         {!loading && form && (
           <form onSubmit={handleSubmit}>
             <div className="form-field">
+              <label>Logo</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={form.logoDataUrl || '/api/logo'} alt="Logo actuel" style={{ width: 48, height: 48, objectFit: 'contain', borderRadius: 8, border: '1px solid var(--border, #e3e9f1)' }} />
+                <div>
+                  <input type="file" accept="image/*" onChange={handleLogoChange} />
+                  {form.logoDataUrl && (
+                    <button type="button" className="item-add-link" style={{ fontSize: 11, marginTop: 4 }} onClick={() => setForm({ ...form, logoDataUrl: null })}>
+                      Revenir au logo par défaut
+                    </button>
+                  )}
+                </div>
+              </div>
+              {logoError && <p className="form-error" style={{ marginTop: 6 }}>{logoError}</p>}
+            </div>
+            <div className="form-field">
               <label>Nom de l’entreprise</label>
               <input required value={form.companyName} onChange={(event) => setForm({ ...form, companyName: event.target.value })} placeholder="Ex : Barry-Gate Multi Service" />
             </div>
@@ -124,6 +192,20 @@ export function SettingsView() {
                 <input required value={form.country} onChange={(event) => setForm({ ...form, country: event.target.value })} placeholder="Ex : Mauritanie" />
               </div>
             )}
+            <div className="form-field">
+              <label>Adresse (sur les factures)</label>
+              <input value={form.companyAddress ?? ''} onChange={(event) => setForm({ ...form, companyAddress: event.target.value })} placeholder="Ex : Madina Marché, Conakry" />
+            </div>
+            <div className="form-row">
+              <div className="form-field">
+                <label>Téléphone (sur les factures)</label>
+                <input value={form.companyPhone ?? ''} onChange={(event) => setForm({ ...form, companyPhone: event.target.value })} placeholder="Ex : 629 59 09 64" />
+              </div>
+              <div className="form-field">
+                <label>E-mail (sur les factures)</label>
+                <input type="email" value={form.companyEmail ?? ''} onChange={(event) => setForm({ ...form, companyEmail: event.target.value })} placeholder="Ex : contact@entreprise.com" />
+              </div>
+            </div>
             <div className="form-actions">
               <button type="submit" className="btn-primary" disabled={saving}>
                 <Save size={14} /> {saving ? 'Enregistrement...' : 'Enregistrer'}

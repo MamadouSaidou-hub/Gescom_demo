@@ -2,7 +2,7 @@
 
 import { createContext, useContext, type ReactNode } from 'react'
 
-export type AppSettings = { companyName: string; companyShortName: string; country: string; currency: string }
+export type AppSettings = { companyName: string; companyShortName: string; country: string; currency: string; address: string; phone: string; email: string }
 
 const SettingsContext = createContext<AppSettings | null>(null)
 

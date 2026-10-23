@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import { Download, Mail, MessageCircle, Printer } from 'lucide-react'
 import { companyInfo } from '@/lib/company-info'
-import { useSettings } from '@/components/settings-provider'
+import { useSettings, type AppSettings } from '@/components/settings-provider'
+import { amountInWords } from '@/lib/number-to-words'
 
 const statusLabel: Record<string, string> = { paid: 'Payée', partial: 'Partielle', credit: 'À crédit' }
 
@@ -37,7 +38,8 @@ async function loadImageAsDataUrl(url: string): Promise<string | null> {
   }
 }
 
-async function buildInvoicePdf(sale: SaleDetail, companyName: string) {
+async function buildInvoicePdf(sale: SaleDetail, branding: AppSettings) {
+  const { companyName, address, phone, email, currency } = branding
   const { jsPDF } = await import('jspdf')
   const autoTableModule = await import('jspdf-autotable')
   const autoTable = autoTableModule.default
@@ -46,7 +48,7 @@ async function buildInvoicePdf(sale: SaleDetail, companyName: string) {
   const doc = new jsPDF()
   const pageWidth = doc.internal.pageSize.getWidth()
 
-  const logoDataUrl = await loadImageAsDataUrl(companyInfo.logoPath)
+  const logoDataUrl = await loadImageAsDataUrl('/api/logo')
   if (logoDataUrl) {
     try {
       const format = logoDataUrl.includes('image/png') ? 'PNG' : 'JPEG'
@@ -65,7 +67,7 @@ async function buildInvoicePdf(sale: SaleDetail, companyName: string) {
   doc.text(companyInfo.tagline.toUpperCase(), textX, 25)
   doc.setFontSize(8.5)
   doc.setTextColor(120, 130, 145)
-  doc.text(`${companyInfo.address}  ·  ${companyInfo.phone}  ·  ${companyInfo.email}`, textX, 30)
+  doc.text(`${address}  ·  ${phone}  ·  ${email}`, textX, 30)
 
   doc.setFontSize(18)
   doc.setTextColor(...NAVY)
@@ -121,6 +123,13 @@ async function buildInvoicePdf(sale: SaleDetail, companyName: string) {
     afterTotal += 6
   }
 
+  doc.setFontSize(9)
+  doc.setTextColor(90, 107, 130)
+  doc.text('Arrêtée la présente facture à la somme de :', 14, afterTotal + 4)
+  doc.setFont('helvetica', 'italic')
+  doc.text(`${amountInWords(sale.totalAmount)} ${currency}`, 14, afterTotal + 9)
+  doc.setFont('helvetica', 'normal')
+
   doc.setFontSize(8.5)
   doc.setTextColor(120, 130, 145)
   doc.text(`Merci pour votre confiance — ${companyName}`, pageWidth / 2, 285, { align: 'center' })
@@ -129,12 +138,13 @@ async function buildInvoicePdf(sale: SaleDetail, companyName: string) {
 }
 
 export function InvoiceActions({ sale }: { sale: SaleDetail }) {
-  const { companyName } = useSettings()
+  const settings = useSettings()
+  const { companyName, phone, email } = settings
   const [generating, setGenerating] = useState<'download' | 'email' | 'whatsapp' | null>(null)
   const [hint, setHint] = useState('')
 
   async function downloadPdf() {
-    const doc = await buildInvoicePdf(sale, companyName)
+    const doc = await buildInvoicePdf(sale, settings)
     doc.save(`facture-${sale.reference}.pdf`)
   }
 
@@ -165,7 +175,7 @@ export function InvoiceActions({ sale }: { sale: SaleDetail }) {
       await downloadPdf()
       setHint('PDF téléchargé — joignez-le manuellement au brouillon e-mail qui vient de s’ouvrir.')
       const subject = `Facture ${sale.reference} — ${companyName}`
-      const body = `Bonjour,\n\nVeuillez trouver ci-joint la facture ${sale.reference} d'un montant de ${sale.totalAmountFormatted}.\n\nMerci de votre confiance.\n\n${companyName}\n${companyInfo.phone} · ${companyInfo.email}`
+      const body = `Bonjour,\n\nVeuillez trouver ci-joint la facture ${sale.reference} d'un montant de ${sale.totalAmountFormatted}.\n\nMerci de votre confiance.\n\n${companyName}\n${phone} · ${email}`
       window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
     } finally {
       setGenerating(null)

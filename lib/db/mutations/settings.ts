@@ -7,7 +7,16 @@ export async function getAppSettings() {
   return row ?? null
 }
 
-export async function updateAppSettings(input: { companyName: string; companyShortName: string; country: string; currency: string }) {
+export async function updateAppSettings(input: {
+  companyName: string
+  companyShortName: string
+  country: string
+  currency: string
+  companyAddress?: string | null
+  companyPhone?: string | null
+  companyEmail?: string | null
+  logoDataUrl?: string | null
+}) {
   const [row] = await db
     .insert(appSettings)
     .values({ id: 1, ...input })

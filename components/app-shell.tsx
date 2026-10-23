@@ -27,7 +27,6 @@ import {
 import { authClient } from '@/lib/auth-client'
 import { AppearanceMenu } from '@/components/appearance-menu'
 import { NotificationMenu } from '@/components/notification-menu'
-import { companyInfo } from '@/lib/company-info'
 import { useSettings } from '@/components/settings-provider'
 
 const navItems = [
@@ -144,7 +143,7 @@ export function AppShell({
       <aside className={`sidebar ${menuOpen ? 'sidebar-open' : ''}`}>
         <div className="brand-lockup">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={companyInfo.logoPath} alt={companyShortName} className="brand-mark" />
+          <img src="/api/logo" alt={companyShortName} className="brand-mark" />
           <div><strong>{companyShortName}</strong><span>{companyName}</span></div>
           <button className="mobile-close" onClick={() => setMenuOpen(false)} aria-label="Fermer le menu"><X /></button>
         </div>

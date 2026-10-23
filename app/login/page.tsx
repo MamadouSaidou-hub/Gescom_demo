@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { authClient } from '@/lib/auth-client'
-import { companyInfo } from '@/lib/company-info'
 import { useSettings } from '@/components/settings-provider'
 
 export default function LoginPage() {
@@ -36,7 +35,7 @@ export default function LoginPage() {
       <div className="modal-panel" style={{ width: '100%', maxWidth: 360 }}>
         <div className="brand-lockup" style={{ paddingBottom: 18 }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={companyInfo.logoPath} alt={companyShortName} className="brand-mark" />
+          <img src="/api/logo" alt={companyShortName} className="brand-mark" />
           <div>
             <strong>{companyShortName}</strong>
             <span>{companyName}</span>

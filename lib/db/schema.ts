@@ -27,6 +27,12 @@ export const appSettings = pgTable('app_settings', {
   companyShortName: text('company_short_name').notNull(),
   country: text('country').notNull(),
   currency: text('currency').notNull(),
+  // Address/phone/email shown on invoices. Logo stored as a data: URL (base64) — simplest option
+  // that needs no object storage bucket/credentials; fine at logo scale, not meant for large files.
+  companyAddress: text('company_address'),
+  companyPhone: text('company_phone'),
+  companyEmail: text('company_email'),
+  logoDataUrl: text('logo_data_url'),
 })
 
 export const products = pgTable('products', {
