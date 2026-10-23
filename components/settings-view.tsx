@@ -9,6 +9,21 @@ import { fetchJson } from '@/lib/fetch-json'
 
 type AppSettings = { companyName: string; companyShortName: string; country: string; currency: string }
 
+// FCFA is the common screen label for both the UEMOA (XOF) and CEMAC (XAF) francs — intentionally
+// not the ISO code, per the team's call that "XOF" would confuse clients who only know "FCFA".
+const COUNTRY_OPTIONS = [
+  { name: 'Guinée', currency: 'GNF' },
+  { name: 'Sénégal', currency: 'FCFA' },
+  { name: 'Côte d’Ivoire', currency: 'FCFA' },
+  { name: 'Mali', currency: 'FCFA' },
+  { name: 'Burkina Faso', currency: 'FCFA' },
+  { name: 'Bénin', currency: 'FCFA' },
+  { name: 'Togo', currency: 'FCFA' },
+  { name: 'Niger', currency: 'FCFA' },
+  { name: 'Djibouti', currency: 'DJF' },
+]
+const OTHER_COUNTRY = 'Autre'
+
 export function SettingsView() {
   const router = useRouter()
   const [form, setForm] = useState<AppSettings | null>(null)
@@ -16,13 +31,29 @@ export function SettingsView() {
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [customCountry, setCustomCountry] = useState(false)
 
   useEffect(() => {
     fetchJson<{ settings: AppSettings }>('/api/parametres')
-      .then((json) => setForm(json.settings))
+      .then((json) => {
+        setForm(json.settings)
+        setCustomCountry(!COUNTRY_OPTIONS.some((option) => option.name === json.settings.country))
+      })
       .catch((err) => setError(err instanceof Error ? err.message : 'Erreur inconnue.'))
       .finally(() => setLoading(false))
   }, [])
+
+  function handleCountryChange(value: string) {
+    if (!form) return
+    if (value === OTHER_COUNTRY) {
+      setCustomCountry(true)
+      setForm({ ...form, country: '' })
+      return
+    }
+    setCustomCountry(false)
+    const preset = COUNTRY_OPTIONS.find((option) => option.name === value)
+    setForm({ ...form, country: value, currency: preset?.currency ?? form.currency })
+  }
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
@@ -76,13 +107,23 @@ export function SettingsView() {
             <div className="form-row">
               <div className="form-field">
                 <label>Pays</label>
-                <input required value={form.country} onChange={(event) => setForm({ ...form, country: event.target.value })} placeholder="Ex : Guinée, Sénégal, Djibouti..." />
+                <select required value={customCountry ? OTHER_COUNTRY : form.country} onChange={(event) => handleCountryChange(event.target.value)}>
+                  <option value="" disabled>Sélectionner...</option>
+                  {COUNTRY_OPTIONS.map((option) => <option key={option.name} value={option.name}>{option.name}</option>)}
+                  <option value={OTHER_COUNTRY}>Autre</option>
+                </select>
               </div>
               <div className="form-field">
-                <label>Devise (code)</label>
-                <input required value={form.currency} onChange={(event) => setForm({ ...form, currency: event.target.value.toUpperCase() })} placeholder="Ex : GNF, XOF, DJF" maxLength={6} />
+                <label>Devise</label>
+                <input required value={form.currency} onChange={(event) => setForm({ ...form, currency: event.target.value.toUpperCase() })} placeholder="Ex : GNF, FCFA, DJF" maxLength={6} readOnly={!customCountry} disabled={!customCountry} />
               </div>
             </div>
+            {customCountry && (
+              <div className="form-field">
+                <label>Nom du pays</label>
+                <input required value={form.country} onChange={(event) => setForm({ ...form, country: event.target.value })} placeholder="Ex : Mauritanie" />
+              </div>
+            )}
             <div className="form-actions">
               <button type="submit" className="btn-primary" disabled={saving}>
                 <Save size={14} /> {saving ? 'Enregistrement...' : 'Enregistrer'}
