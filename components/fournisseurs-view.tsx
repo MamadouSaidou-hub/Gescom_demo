@@ -9,6 +9,7 @@ import { LoadError } from '@/components/load-error'
 import { downloadCsv } from '@/lib/download-csv'
 import { fetchJson } from '@/lib/fetch-json'
 import { businessConfig } from '@/lib/business-config'
+import { useSettings } from '@/components/settings-provider'
 
 type Supplier = {
   id: number
@@ -185,6 +186,7 @@ function RecordDeliveryForm({
 }
 
 function RecordSupplierPaymentForm({ supplier, onCreated }: { supplier: Supplier; onCreated: () => void }) {
+  const { currency } = useSettings()
   const [amount, setAmount] = useState('')
   const [method, setMethod] = useState<'cash' | 'mobile_money' | 'bank_transfer' | 'check'>('bank_transfer')
   const [error, setError] = useState('')
@@ -218,7 +220,7 @@ function RecordSupplierPaymentForm({ supplier, onCreated }: { supplier: Supplier
       {error && <p className="form-error">{error}</p>}
       <p className="section-subtitle">Dû au fournisseur : <strong>{supplier.owed}</strong></p>
       <div className="form-row">
-        <div className="form-field"><label>Montant payé (GNF)</label><input required type="number" min="1" value={amount} onChange={(event) => setAmount(event.target.value)} /></div>
+        <div className="form-field"><label>Montant payé ({currency})</label><input required type="number" min="1" value={amount} onChange={(event) => setAmount(event.target.value)} /></div>
         <div className="form-field">
           <label>Méthode</label>
           <select value={method} onChange={(event) => setMethod(event.target.value as typeof method)}>

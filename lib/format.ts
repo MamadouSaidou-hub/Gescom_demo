@@ -1,5 +1,7 @@
+import { businessConfig } from './business-config'
+
 export function formatFcfa(value: number) {
-  return `${Math.round(value).toLocaleString('fr-FR')} GNF`
+  return `${Math.round(value).toLocaleString('fr-FR')} ${businessConfig.currency}`
 }
 
 export function pctChange(current: number, previous: number) {

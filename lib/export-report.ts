@@ -23,19 +23,22 @@ export type ReportsData = {
 
 const PRIMARY_RGB: [number, number, number] = [11, 46, 92] // matches --primary in app/globals.css
 
+export type ReportBranding = { companyShortName: string; currency: string }
+const defaultBranding: ReportBranding = { companyShortName: companyInfo.shortName, currency: businessConfig.currency }
+
 function docTitle(periodLabel: string) {
   const generatedAt = new Date().toLocaleString('fr-FR', { dateStyle: 'long', timeStyle: 'short' })
   return { generatedAt }
 }
 
-export function exportReportPdf(data: ReportsData, periodLabel: string) {
+export function exportReportPdf(data: ReportsData, periodLabel: string, branding: ReportBranding = defaultBranding) {
   const doc = new jsPDF()
   const { generatedAt } = docTitle(periodLabel)
   const pageWidth = doc.internal.pageSize.getWidth()
 
   doc.setFontSize(18)
   doc.setTextColor(...PRIMARY_RGB)
-  doc.text(`${companyInfo.shortName} — Rapport d’activité`, 14, 18)
+  doc.text(`${branding.companyShortName} — Rapport d’activité`, 14, 18)
   doc.setFontSize(10)
   doc.setTextColor(120, 120, 120)
   doc.text(`Période : ${periodLabel}  ·  Généré le ${generatedAt}`, 14, 25)
@@ -132,28 +135,28 @@ export function exportReportPdf(data: ReportsData, periodLabel: string) {
     doc.text(`Page ${i} / ${pageCount}`, pageWidth - 25, doc.internal.pageSize.getHeight() - 8)
   }
 
-  doc.save(`rapport-${companyInfo.shortName.toLowerCase()}-${new Date().toISOString().slice(0, 10)}.pdf`)
+  doc.save(`rapport-${branding.companyShortName.toLowerCase()}-${new Date().toISOString().slice(0, 10)}.pdf`)
 }
 
-export function exportReportExcel(data: ReportsData, periodLabel: string) {
+export function exportReportExcel(data: ReportsData, periodLabel: string, branding: ReportBranding = defaultBranding) {
   const workbook = XLSX.utils.book_new()
-  const revenueLabel = `Chiffre d’affaires (${businessConfig.currency})`
-  const amountLabel = `Montant (${businessConfig.currency})`
+  const revenueLabel = `Chiffre d’affaires (${branding.currency})`
+  const amountLabel = `Montant (${branding.currency})`
 
   const summarySheet = XLSX.utils.aoa_to_sheet([
-    [`Rapport d’activité ${companyInfo.shortName}`],
+    [`Rapport d’activité ${branding.companyShortName}`],
     [`Période : ${periodLabel}`],
     [`Généré le ${new Date().toLocaleString('fr-FR')}`],
     [],
     ['Indicateur', 'Valeur'],
     [revenueLabel, data.totalRevenue],
-    [`Marge brute (${businessConfig.currency})`, data.totalMargin],
+    [`Marge brute (${branding.currency})`, data.totalMargin],
     ['Marge (%)', Number(data.marginPct.toFixed(1))],
     ['Nombre de ventes', data.salesCount],
-    [`Panier moyen (${businessConfig.currency})`, Math.round(data.avgBasket)],
+    [`Panier moyen (${branding.currency})`, Math.round(data.avgBasket)],
     [`${businessConfig.unit.basePlural} reçus (fournisseurs)`, data.supplierSummary.totalSacks],
     ['Livraisons fournisseurs', data.supplierSummary.deliveriesCount],
-    [`Payé aux fournisseurs (${businessConfig.currency})`, data.supplierSummary.totalPaid],
+    [`Payé aux fournisseurs (${branding.currency})`, data.supplierSummary.totalPaid],
   ])
   XLSX.utils.book_append_sheet(workbook, summarySheet, 'Résumé')
 
@@ -173,7 +176,7 @@ export function exportReportExcel(data: ReportsData, periodLabel: string) {
       Produit: row.name,
       [`Quantité (${businessConfig.unit.basePluralLower})`]: row.quantity,
       [revenueLabel]: row.revenue,
-      [`Marge (${businessConfig.currency})`]: row.margin,
+      [`Marge (${branding.currency})`]: row.margin,
     })),
   )
   XLSX.utils.book_append_sheet(workbook, productsSheet, 'Top produits')
@@ -183,5 +186,5 @@ export function exportReportExcel(data: ReportsData, periodLabel: string) {
   )
   XLSX.utils.book_append_sheet(workbook, clientsSheet, 'Top clients')
 
-  XLSX.writeFile(workbook, `rapport-${companyInfo.shortName.toLowerCase()}-${new Date().toISOString().slice(0, 10)}.xlsx`)
+  XLSX.writeFile(workbook, `rapport-${branding.companyShortName.toLowerCase()}-${new Date().toISOString().slice(0, 10)}.xlsx`)
 }

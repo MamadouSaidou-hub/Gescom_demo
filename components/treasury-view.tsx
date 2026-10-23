@@ -6,6 +6,7 @@ import { AppShell } from '@/components/app-shell'
 import { Modal } from '@/components/modal'
 import { LoadError } from '@/components/load-error'
 import { fetchJson } from '@/lib/fetch-json'
+import { useSettings } from '@/components/settings-provider'
 
 const periods = ['Aujourd’hui', '7 derniers jours', 'Ce mois-ci']
 
@@ -38,6 +39,7 @@ function MetricCard({ label, value, icon: Icon, tone }: { label: string; value: 
 }
 
 function NewPaymentForm({ storeOptions, clientOptions, onCreated }: { storeOptions: StoreOption[]; clientOptions: ClientOption[]; onCreated: () => void }) {
+  const { currency } = useSettings()
   const [clientId, setClientId] = useState('')
   const [amount, setAmount] = useState('')
   const [method, setMethod] = useState<'cash' | 'mobile_money' | 'bank_transfer' | 'check'>('cash')
@@ -85,7 +87,7 @@ function NewPaymentForm({ storeOptions, clientOptions, onCreated }: { storeOptio
         </select>
       </div>
       <div className="form-row">
-        <div className="form-field"><label>Montant (GNF)</label><input required type="number" min="1" value={amount} onChange={(event) => setAmount(event.target.value)} /></div>
+        <div className="form-field"><label>Montant ({currency})</label><input required type="number" min="1" value={amount} onChange={(event) => setAmount(event.target.value)} /></div>
         <div className="form-field">
           <label>Méthode</label>
           <select value={method} onChange={(event) => setMethod(event.target.value as typeof method)}>

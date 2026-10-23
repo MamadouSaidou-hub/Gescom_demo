@@ -18,6 +18,17 @@ export const stores = pgTable('stores', {
   ...timestamps,
 })
 
+// Single-row table (id is always 1) holding the demo's runtime-editable branding —
+// company name, country, currency — so a sales demo can be re-themed per prospect from a
+// Settings page instead of editing code and redeploying.
+export const appSettings = pgTable('app_settings', {
+  id: integer('id').primaryKey().default(1),
+  companyName: text('company_name').notNull(),
+  companyShortName: text('company_short_name').notNull(),
+  country: text('country').notNull(),
+  currency: text('currency').notNull(),
+})
+
 export const products = pgTable('products', {
   id: serial('id').primaryKey(),
   name: text('name').notNull(),

@@ -8,6 +8,7 @@ import { LoadError } from '@/components/load-error'
 import { downloadCsv } from '@/lib/download-csv'
 import { fetchJson } from '@/lib/fetch-json'
 import { businessConfig } from '@/lib/business-config'
+import { useSettings } from '@/components/settings-provider'
 
 const periods = ['Aujourd’hui', '7 derniers jours', 'Ce mois-ci']
 
@@ -55,6 +56,7 @@ function NewSaleForm({
   productOptions: ProductOption[]
   onCreated: () => void
 }) {
+  const { currency } = useSettings()
   const [storeId, setStoreId] = useState('')
   const [clientId, setClientId] = useState('')
   const [creatingClient, setCreatingClient] = useState(false)
@@ -220,7 +222,7 @@ function NewSaleForm({
                   <input required type="number" min="1" placeholder={`Qté (${businessConfig.unit.basePluralLower})`} value={item.quantity} onChange={(event) => updateItem(index, { quantity: event.target.value })} />
                 </div>
               )}
-              <div className="form-field" style={{ marginBottom: 0 }}><input readOnly disabled value={item.unitPrice ? `${Number(item.unitPrice).toLocaleString('fr-FR')} ${businessConfig.currency}` : 'Prix'} title="Prix catalogue — non modifiable" /></div>
+              <div className="form-field" style={{ marginBottom: 0 }}><input readOnly disabled value={item.unitPrice ? `${Number(item.unitPrice).toLocaleString('fr-FR')} ${currency}` : 'Prix'} title="Prix catalogue — non modifiable" /></div>
               <button type="button" className="item-row-remove" onClick={() => removeItem(index)} disabled={items.length === 1} aria-label="Retirer la ligne"><Trash2 size={14} /></button>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
@@ -250,7 +252,7 @@ function NewSaleForm({
       })}
       <button type="button" className="item-add-link" onClick={addItem}><Plus size={13} /> Ajouter un article</button>
 
-      <div className="sale-total-row"><span>Total</span><span>{total.toLocaleString('fr-FR')} {businessConfig.currency}</span></div>
+      <div className="sale-total-row"><span>Total</span><span>{total.toLocaleString('fr-FR')} {currency}</span></div>
 
       <div className="form-row">
         <div className="form-field">

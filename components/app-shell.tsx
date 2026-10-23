@@ -15,6 +15,7 @@ import {
   Package,
   ReceiptText,
   Search,
+  Settings,
   ShoppingCart,
   Store,
   Truck,
@@ -27,6 +28,7 @@ import { authClient } from '@/lib/auth-client'
 import { AppearanceMenu } from '@/components/appearance-menu'
 import { NotificationMenu } from '@/components/notification-menu'
 import { companyInfo } from '@/lib/company-info'
+import { useSettings } from '@/components/settings-provider'
 
 const navItems = [
   { href: '/', label: 'Tableau de bord', icon: LayoutDashboard, adminOnly: false },
@@ -43,6 +45,7 @@ const gestionItems = [
   { href: '/caisse', label: 'Caisse & Dépenses', icon: Banknote, adminOnly: true },
   { href: '/rapports', label: 'Rapports', icon: ReceiptText, adminOnly: true },
   { href: '/utilisateurs', label: 'Utilisateurs', icon: UserCog, adminOnly: true },
+  { href: '/parametres', label: 'Paramètres', icon: Settings, adminOnly: true },
 ]
 
 function UserChip() {
@@ -134,14 +137,15 @@ export function AppShell({
   const [searchOpen, setSearchOpen] = useState(false)
   const { data: session } = authClient.useSession()
   const isAdmin = session?.user?.role === 'admin'
+  const { companyName, companyShortName } = useSettings()
 
   return (
     <div className="app-frame">
       <aside className={`sidebar ${menuOpen ? 'sidebar-open' : ''}`}>
         <div className="brand-lockup">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={companyInfo.logoPath} alt={companyInfo.shortName} className="brand-mark" />
-          <div><strong>{companyInfo.shortName}</strong><span>{companyInfo.displayName}</span></div>
+          <img src={companyInfo.logoPath} alt={companyShortName} className="brand-mark" />
+          <div><strong>{companyShortName}</strong><span>{companyName}</span></div>
           <button className="mobile-close" onClick={() => setMenuOpen(false)} aria-label="Fermer le menu"><X /></button>
         </div>
         <div className="workspace-select"><span className="workspace-dot" /><span>Direction générale</span><ChevronDown aria-hidden="true" /></div>

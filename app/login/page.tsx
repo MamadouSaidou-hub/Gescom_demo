@@ -4,9 +4,11 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { authClient } from '@/lib/auth-client'
 import { companyInfo } from '@/lib/company-info'
+import { useSettings } from '@/components/settings-provider'
 
 export default function LoginPage() {
   const router = useRouter()
+  const { companyName, companyShortName } = useSettings()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -34,10 +36,10 @@ export default function LoginPage() {
       <div className="modal-panel" style={{ width: '100%', maxWidth: 360 }}>
         <div className="brand-lockup" style={{ paddingBottom: 18 }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={companyInfo.logoPath} alt={companyInfo.shortName} className="brand-mark" />
+          <img src={companyInfo.logoPath} alt={companyShortName} className="brand-mark" />
           <div>
-            <strong>{companyInfo.shortName}</strong>
-            <span>{companyInfo.displayName}</span>
+            <strong>{companyShortName}</strong>
+            <span>{companyName}</span>
           </div>
         </div>
         <form onSubmit={handleSubmit}>

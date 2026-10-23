@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm'
 import { auth } from './auth'
 import { db } from './db/client'
 import { stores } from './db/schema'
+import { ensureSettingsLoaded } from './settings-cache'
 
 export type SessionContext = {
   userId: string
@@ -12,6 +13,7 @@ export type SessionContext = {
 }
 
 export async function getSessionContext(): Promise<SessionContext | null> {
+  await ensureSettingsLoaded()
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session) return null
 

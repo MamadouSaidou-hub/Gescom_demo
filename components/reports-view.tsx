@@ -6,6 +6,7 @@ import { AppShell } from '@/components/app-shell'
 import { LoadError } from '@/components/load-error'
 import { fetchJson } from '@/lib/fetch-json'
 import { exportReportExcel, exportReportPdf, type ReportsData } from '@/lib/export-report'
+import { useSettings } from '@/components/settings-provider'
 
 const periods = ['Aujourd’hui', '7 derniers jours', 'Ce mois-ci']
 
@@ -35,6 +36,7 @@ function RankBar({ label, value, formatted, max, color, sub }: { label: string; 
 }
 
 export function ReportsView() {
+  const { companyShortName, currency } = useSettings()
   const [period, setPeriod] = useState(periods[2])
   const [data, setData] = useState<ReportsData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -73,8 +75,8 @@ export function ReportsView() {
         <div className="filter-row">
           <label className="select-wrap"><span className="sr-only">Période</span><select value={period} onChange={(event) => setPeriod(event.target.value)}>{periods.map((item) => <option key={item}>{item}</option>)}</select><ChevronDown /></label>
           <div className="export-group">
-            <button className="btn-secondary" disabled={!data} onClick={() => data && exportReportPdf(data, period)}><Download size={13} /> PDF</button>
-            <button className="btn-secondary" disabled={!data} onClick={() => data && exportReportExcel(data, period)}><FileSpreadsheet size={13} /> Excel</button>
+            <button className="btn-secondary" disabled={!data} onClick={() => data && exportReportPdf(data, period, { companyShortName, currency })}><Download size={13} /> PDF</button>
+            <button className="btn-secondary" disabled={!data} onClick={() => data && exportReportExcel(data, period, { companyShortName, currency })}><FileSpreadsheet size={13} /> Excel</button>
           </div>
         </div>
       </section>

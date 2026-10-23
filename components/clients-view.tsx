@@ -9,6 +9,7 @@ import { LoadError } from '@/components/load-error'
 import { authClient } from '@/lib/auth-client'
 import { downloadCsv } from '@/lib/download-csv'
 import { fetchJson } from '@/lib/fetch-json'
+import { useSettings } from '@/components/settings-provider'
 
 type Client = {
   id: number
@@ -89,6 +90,7 @@ function NewClientForm({ storeOptions, onCreated }: { storeOptions: StoreOption[
 }
 
 function RecordPaymentForm({ client, storeOptions, onCreated }: { client: Client; storeOptions: StoreOption[]; onCreated: () => void }) {
+  const { currency } = useSettings()
   const [amount, setAmount] = useState('')
   const [method, setMethod] = useState<'cash' | 'mobile_money' | 'bank_transfer' | 'check'>('cash')
   const [storeId, setStoreId] = useState(String(client.storeId ?? storeOptions[0]?.id ?? ''))
@@ -123,7 +125,7 @@ function RecordPaymentForm({ client, storeOptions, onCreated }: { client: Client
       {error && <p className="form-error">{error}</p>}
       <p className="section-subtitle">Créance en cours : <strong>{client.outstanding}</strong></p>
       <div className="form-row">
-        <div className="form-field"><label>Montant encaissé (GNF)</label><input required type="number" min="1" value={amount} onChange={(event) => setAmount(event.target.value)} /></div>
+        <div className="form-field"><label>Montant encaissé ({currency})</label><input required type="number" min="1" value={amount} onChange={(event) => setAmount(event.target.value)} /></div>
         <div className="form-field">
           <label>Méthode</label>
           <select value={method} onChange={(event) => setMethod(event.target.value as typeof method)}>

@@ -7,6 +7,7 @@ import { Modal } from '@/components/modal'
 import { LoadError } from '@/components/load-error'
 import { fetchJson } from '@/lib/fetch-json'
 import { downloadCsv } from '@/lib/download-csv'
+import { useSettings } from '@/components/settings-provider'
 
 const periods = ['Aujourd’hui', '7 derniers jours', 'Ce mois-ci']
 
@@ -34,6 +35,7 @@ function MetricCard({ label, value, icon: Icon, tone }: { label: string; value: 
 }
 
 function NewAccountForm({ onCreated }: { onCreated: () => void }) {
+  const { currency } = useSettings()
   const [name, setName] = useState('')
   const [type, setType] = useState<CashAccountType>('cash')
   const [initialBalance, setInitialBalance] = useState('0')
@@ -77,7 +79,7 @@ function NewAccountForm({ onCreated }: { onCreated: () => void }) {
             <option value="other">Autre</option>
           </select>
         </div>
-        <div className="form-field"><label>Solde initial (GNF)</label><input required type="number" min="0" value={initialBalance} onChange={(event) => setInitialBalance(event.target.value)} /></div>
+        <div className="form-field"><label>Solde initial ({currency})</label><input required type="number" min="0" value={initialBalance} onChange={(event) => setInitialBalance(event.target.value)} /></div>
       </div>
       <div className="form-actions"><button type="submit" className="btn-primary" disabled={submitting}>{submitting ? 'Création...' : 'Créer la caisse'}</button></div>
     </form>
@@ -85,6 +87,7 @@ function NewAccountForm({ onCreated }: { onCreated: () => void }) {
 }
 
 function NewMovementForm({ type, accounts, onCreated }: { type: 'expense' | 'deposit'; accounts: CashAccount[]; onCreated: () => void }) {
+  const { currency } = useSettings()
   const [cashAccountId, setCashAccountId] = useState('')
   const [category, setCategory] = useState('')
   const [description, setDescription] = useState('')
@@ -129,7 +132,7 @@ function NewMovementForm({ type, accounts, onCreated }: { type: 'expense' | 'dep
         </select>
       </div>
       <div className="form-row">
-        <div className="form-field"><label>Montant (GNF)</label><input required type="number" min="1" value={amount} onChange={(event) => setAmount(event.target.value)} /></div>
+        <div className="form-field"><label>Montant ({currency})</label><input required type="number" min="1" value={amount} onChange={(event) => setAmount(event.target.value)} /></div>
         <div className="form-field"><label>Motif</label><input required value={category} onChange={(event) => setCategory(event.target.value)} placeholder={type === 'expense' ? 'Ex : Loyer, Salaires, Transport...' : 'Ex : Vente comptant, Apport...'} /></div>
       </div>
       <div className="form-field"><label>Description (optionnel)</label><input value={description} onChange={(event) => setDescription(event.target.value)} /></div>

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Download, Mail, MessageCircle, Printer } from 'lucide-react'
 import { companyInfo } from '@/lib/company-info'
+import { useSettings } from '@/components/settings-provider'
 
 const statusLabel: Record<string, string> = { paid: 'Payée', partial: 'Partielle', credit: 'À crédit' }
 
@@ -36,7 +37,7 @@ async function loadImageAsDataUrl(url: string): Promise<string | null> {
   }
 }
 
-async function buildInvoicePdf(sale: SaleDetail) {
+async function buildInvoicePdf(sale: SaleDetail, companyName: string) {
   const { jsPDF } = await import('jspdf')
   const autoTableModule = await import('jspdf-autotable')
   const autoTable = autoTableModule.default
@@ -58,7 +59,7 @@ async function buildInvoicePdf(sale: SaleDetail) {
   const textX = logoDataUrl ? 38 : 14
   doc.setFontSize(13)
   doc.setTextColor(...NAVY)
-  doc.text(companyInfo.name, textX, 20)
+  doc.text(companyName, textX, 20)
   doc.setFontSize(8.5)
   doc.setTextColor(46, 158, 63)
   doc.text(companyInfo.tagline.toUpperCase(), textX, 25)
@@ -122,17 +123,18 @@ async function buildInvoicePdf(sale: SaleDetail) {
 
   doc.setFontSize(8.5)
   doc.setTextColor(120, 130, 145)
-  doc.text(`Merci pour votre confiance — ${companyInfo.name}`, pageWidth / 2, 285, { align: 'center' })
+  doc.text(`Merci pour votre confiance — ${companyName}`, pageWidth / 2, 285, { align: 'center' })
 
   return doc
 }
 
 export function InvoiceActions({ sale }: { sale: SaleDetail }) {
+  const { companyName } = useSettings()
   const [generating, setGenerating] = useState<'download' | 'email' | 'whatsapp' | null>(null)
   const [hint, setHint] = useState('')
 
   async function downloadPdf() {
-    const doc = await buildInvoicePdf(sale)
+    const doc = await buildInvoicePdf(sale, companyName)
     doc.save(`facture-${sale.reference}.pdf`)
   }
 
@@ -150,7 +152,7 @@ export function InvoiceActions({ sale }: { sale: SaleDetail }) {
     try {
       await downloadPdf()
       setHint('PDF téléchargé — joignez-le manuellement dans la conversation WhatsApp qui vient de s’ouvrir.')
-      const message = `Facture ${sale.reference} — ${companyInfo.name}\nMontant : ${sale.totalAmountFormatted}\nMerci de votre confiance !`
+      const message = `Facture ${sale.reference} — ${companyName}\nMontant : ${sale.totalAmountFormatted}\nMerci de votre confiance !`
       window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer')
     } finally {
       setGenerating(null)
@@ -162,8 +164,8 @@ export function InvoiceActions({ sale }: { sale: SaleDetail }) {
     try {
       await downloadPdf()
       setHint('PDF téléchargé — joignez-le manuellement au brouillon e-mail qui vient de s’ouvrir.')
-      const subject = `Facture ${sale.reference} — ${companyInfo.name}`
-      const body = `Bonjour,\n\nVeuillez trouver ci-joint la facture ${sale.reference} d'un montant de ${sale.totalAmountFormatted}.\n\nMerci de votre confiance.\n\n${companyInfo.name}\n${companyInfo.phone} · ${companyInfo.email}`
+      const subject = `Facture ${sale.reference} — ${companyName}`
+      const body = `Bonjour,\n\nVeuillez trouver ci-joint la facture ${sale.reference} d'un montant de ${sale.totalAmountFormatted}.\n\nMerci de votre confiance.\n\n${companyName}\n${companyInfo.phone} · ${companyInfo.email}`
       window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
     } finally {
       setGenerating(null)

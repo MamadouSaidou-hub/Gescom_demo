@@ -6,6 +6,7 @@ import { Modal } from '@/components/modal'
 import { LoadError } from '@/components/load-error'
 import { fetchJson } from '@/lib/fetch-json'
 import { businessConfig } from '@/lib/business-config'
+import { useSettings } from '@/components/settings-provider'
 
 type Tier = { id?: number; thresholdSacks: string; discountPerSack: string }
 type ScaleData = {
@@ -33,6 +34,7 @@ export function DiscountScaleModal({
   partyId: number
   partyName: string
 }) {
+  const { currency } = useSettings()
   const [data, setData] = useState<ScaleData | null>(null)
   const [tiers, setTiers] = useState<Tier[]>([])
   const [loading, setLoading] = useState(true)
@@ -154,7 +156,7 @@ export function DiscountScaleModal({
           {tiers.map((tier, index) => (
             <div className="item-row-grid" style={{ gridTemplateColumns: '1fr 1fr auto' }} key={index}>
               <div className="form-field" style={{ marginBottom: 0 }}><input required type="number" min="1" placeholder={`Seuil (${businessConfig.unit.basePluralLower})`} value={tier.thresholdSacks} onChange={(event) => updateTier(index, { thresholdSacks: event.target.value })} /></div>
-              <div className="form-field" style={{ marginBottom: 0 }}><input required type="number" min="0" placeholder={`Remise/${businessConfig.unit.baseSingularLower} (${businessConfig.currency})`} value={tier.discountPerSack} onChange={(event) => updateTier(index, { discountPerSack: event.target.value })} /></div>
+              <div className="form-field" style={{ marginBottom: 0 }}><input required type="number" min="0" placeholder={`Remise/${businessConfig.unit.baseSingularLower} (${currency})`} value={tier.discountPerSack} onChange={(event) => updateTier(index, { discountPerSack: event.target.value })} /></div>
               <button type="button" className="item-row-remove" onClick={() => removeTier(index)} aria-label="Retirer le palier"><Trash2 size={14} /></button>
             </div>
           ))}

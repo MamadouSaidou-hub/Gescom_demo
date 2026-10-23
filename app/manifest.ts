@@ -1,7 +1,9 @@
 import type { MetadataRoute } from 'next'
 import { companyInfo } from '@/lib/company-info'
+import { ensureSettingsLoaded } from '@/lib/settings-cache'
 
-export default function manifest(): MetadataRoute.Manifest {
+export default async function manifest(): Promise<MetadataRoute.Manifest> {
+  await ensureSettingsLoaded()
   return {
     name: `${companyInfo.displayName} — Gestion`,
     short_name: companyInfo.shortName,

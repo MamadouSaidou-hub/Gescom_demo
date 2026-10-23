@@ -8,6 +8,7 @@ import { fetchJson } from '@/lib/fetch-json'
 import { Modal } from '@/components/modal'
 import { LoadError } from '@/components/load-error'
 import { businessConfig } from '@/lib/business-config'
+import { useSettings } from '@/components/settings-provider'
 
 type StockItem = {
   productId: number
@@ -47,6 +48,7 @@ function MetricCard({ label, value, icon: Icon, tone }: { label: string; value: 
 }
 
 function NewProductForm({ storeOptions, onCreated }: { storeOptions: StoreOption[]; onCreated: () => void }) {
+  const { currency } = useSettings()
   const [name, setName] = useState('')
   const [sku, setSku] = useState('')
   const [category, setCategory] = useState('')
@@ -95,8 +97,8 @@ function NewProductForm({ storeOptions, onCreated }: { storeOptions: StoreOption
         <div className="form-field"><label>Catégorie</label><input required value={category} onChange={(event) => setCategory(event.target.value)} placeholder="Épicerie" /></div>
       </div>
       <div className="form-row">
-        <div className="form-field"><label>Prix de vente (GNF)</label><input required type="number" min="0" value={unitPrice} onChange={(event) => setUnitPrice(event.target.value)} /></div>
-        <div className="form-field"><label>Prix d’achat (GNF)</label><input required type="number" min="0" value={costPrice} onChange={(event) => setCostPrice(event.target.value)} /></div>
+        <div className="form-field"><label>Prix de vente ({currency})</label><input required type="number" min="0" value={unitPrice} onChange={(event) => setUnitPrice(event.target.value)} /></div>
+        <div className="form-field"><label>Prix d’achat ({currency})</label><input required type="number" min="0" value={costPrice} onChange={(event) => setCostPrice(event.target.value)} /></div>
       </div>
       <div className="form-row">
         <div className="form-field"><label>Seuil d’alerte</label><input required type="number" min="0" value={reorderThreshold} onChange={(event) => setReorderThreshold(event.target.value)} /></div>
@@ -118,6 +120,7 @@ function NewProductForm({ storeOptions, onCreated }: { storeOptions: StoreOption
 }
 
 function EditPriceForm({ item, onSaved }: { item: StockItem; onSaved: () => void }) {
+  const { currency } = useSettings()
   const [unitPrice, setUnitPrice] = useState(String(item.unitPriceRaw))
   const [costPrice, setCostPrice] = useState(String(item.costPriceRaw))
   const [error, setError] = useState('')
@@ -151,8 +154,8 @@ function EditPriceForm({ item, onSaved }: { item: StockItem; onSaved: () => void
       {error && <p className="form-error">{error}</p>}
       <p className="section-subtitle">{item.name} ({item.sku})</p>
       <div className="form-row">
-        <div className="form-field"><label>Prix de vente (GNF)</label><input required type="number" min="0" value={unitPrice} onChange={(event) => setUnitPrice(event.target.value)} /></div>
-        <div className="form-field"><label>Prix de revient (GNF)</label><input required type="number" min="0" value={costPrice} onChange={(event) => setCostPrice(event.target.value)} /></div>
+        <div className="form-field"><label>Prix de vente ({currency})</label><input required type="number" min="0" value={unitPrice} onChange={(event) => setUnitPrice(event.target.value)} /></div>
+        <div className="form-field"><label>Prix de revient ({currency})</label><input required type="number" min="0" value={costPrice} onChange={(event) => setCostPrice(event.target.value)} /></div>
       </div>
       <p className="section-subtitle">Le nouveau prix de revient s’applique aux prochaines ventes. Les ventes déjà enregistrées gardent leur marge d’origine.</p>
       <div className="form-actions"><button type="submit" className="btn-primary" disabled={submitting}>{submitting ? 'Enregistrement...' : 'Enregistrer'}</button></div>
