@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { AlertTriangle, ChevronDown, ClipboardCheck, Layers, Package, PackagePlus, Plus, Search, Wallet } from 'lucide-react'
+import { AlertTriangle, ChevronDown, ClipboardCheck, Layers, Package, PackagePlus, Plus, Search, Store, Truck, Wallet } from 'lucide-react'
 import { AppShell } from '@/components/app-shell'
 import { downloadCsv } from '@/lib/download-csv'
 import { fetchJson } from '@/lib/fetch-json'
@@ -25,8 +25,33 @@ type StockItem = {
   status: 'critical' | 'low' | 'ok'
 }
 
+type StoreBreakdown = { store: string; quantity: number; threshold: number; status: 'critical' | 'low' | 'ok' }
+type SupplierDelivery = {
+  supplierName: string
+  store: string
+  sackCount: number
+  tonnage: number | null
+  totalAmountFormatted: string
+  reference: string | null
+  createdAt: string
+}
+type StockProduct = {
+  productId: number
+  name: string
+  sku: string
+  category: string
+  unitPrice: string
+  unitPriceRaw: number
+  costPriceRaw: number
+  totalQuantity: number
+  status: 'critical' | 'low' | 'ok'
+  stores: StoreBreakdown[]
+  deliveries: SupplierDelivery[]
+}
+
 type StockData = {
   items: StockItem[]
+  products: StockProduct[]
   summary: { totalArticles: number; totalQuantity: number; lowCount: number; stockValue: string }
   stores: string[]
 }
@@ -132,7 +157,7 @@ function NewProductForm({ storeOptions, onCreated }: { storeOptions: StoreOption
   )
 }
 
-function EditPriceForm({ item, onSaved }: { item: StockItem; onSaved: () => void }) {
+function EditPriceForm({ item, onSaved }: { item: StockProduct; onSaved: () => void }) {
   const { currency } = useSettings()
   const [unitPrice, setUnitPrice] = useState(String(item.unitPriceRaw))
   const [costPrice, setCostPrice] = useState(String(item.costPriceRaw))
@@ -165,7 +190,7 @@ function EditPriceForm({ item, onSaved }: { item: StockItem; onSaved: () => void
   return (
     <form onSubmit={handleSubmit}>
       {error && <p className="form-error">{error}</p>}
-      <p className="section-subtitle">{item.name} ({item.sku})</p>
+      <p className="section-title" style={{ marginBottom: 8 }}>Prix</p>
       <div className="form-row">
         <div className="form-field"><label>Prix de vente ({currency})</label><input required type="number" min="0" value={unitPrice} onChange={(event) => setUnitPrice(event.target.value)} /></div>
         <div className="form-field"><label>Prix de revient ({currency})</label><input required type="number" min="0" value={costPrice} onChange={(event) => setCostPrice(event.target.value)} /></div>
@@ -323,7 +348,7 @@ export function StockView() {
   const [productModalOpen, setProductModalOpen] = useState(false)
   const [receptionModalOpen, setReceptionModalOpen] = useState(false)
   const [countModalOpen, setCountModalOpen] = useState(false)
-  const [editItem, setEditItem] = useState<StockItem | null>(null)
+  const [detailProduct, setDetailProduct] = useState<StockProduct | null>(null)
   const [counts, setCounts] = useState<StockCountRow[]>([])
   const [refreshKey, setRefreshKey] = useState(0)
 
@@ -360,18 +385,19 @@ export function StockView() {
   }, [store, refreshKey])
 
   const stores = data?.stores ?? ['Tous les magasins']
-  const filteredItems = useMemo(() => {
-    const items = data?.items ?? []
+  const filteredProducts = useMemo(() => {
+    const productList = data?.products ?? []
     const query = search.trim().toLowerCase()
-    if (!query) return items
-    return items.filter((item) => item.name.toLowerCase().includes(query) || item.sku.toLowerCase().includes(query) || item.category.toLowerCase().includes(query))
+    if (!query) return productList
+    return productList.filter(
+      (product) => product.name.toLowerCase().includes(query) || product.sku.toLowerCase().includes(query) || product.category.toLowerCase().includes(query),
+    )
   }, [data, search])
 
   function refresh() {
     setProductModalOpen(false)
     setReceptionModalOpen(false)
     setCountModalOpen(false)
-    setEditItem(null)
     setRefreshKey((key) => key + 1)
   }
 
@@ -403,40 +429,22 @@ export function StockView() {
         <button className="btn-primary" onClick={() => setProductModalOpen(true)}><Plus size={14} /> Nouvel article</button>
       </div>
 
-      <div className="table-panel">
-        <div className="table-scroll">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Produit</th>
-                <th>SKU</th>
-                <th>Catégorie</th>
-                <th>Magasin</th>
-                <th>Quantité</th>
-                <th>Seuil</th>
-                <th>Prix unitaire</th>
-                <th>Statut</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredItems.map((item) => (
-                <tr key={`${item.sku}-${item.store}`}>
-                  <td data-label="Produit">{item.name}</td>
-                  <td data-label="SKU">{item.sku}</td>
-                  <td data-label="Catégorie">{item.category}</td>
-                  <td data-label="Magasin">{item.store}</td>
-                  <td data-label="Quantité">{item.quantity}</td>
-                  <td data-label="Seuil">{item.threshold}</td>
-                  <td data-label="Prix unitaire">{item.unitPrice}</td>
-                  <td data-label="Statut"><span className={`badge ${statusBadge[item.status]}`}>{statusLabel[item.status]}</span></td>
-                  <td data-label="Action"><button className="btn-ghost" onClick={() => setEditItem(item)}>Prix</button></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {!loading && filteredItems.length === 0 && <p className="table-empty">Aucun article ne correspond à votre recherche.</p>}
-        </div>
+      <div className="store-card-grid">
+        {filteredProducts.map((product) => (
+          <article className="store-card clickable-row" key={product.productId} onClick={() => setDetailProduct(product)}>
+            <div className="store-card-head">
+              <span className="store-card-icon"><Package aria-hidden="true" /></span>
+              <div><strong>{product.name}</strong><span>{product.sku} · {product.category}</span></div>
+            </div>
+            <div className="store-card-stats">
+              <div><label><Wallet size={11} style={{ verticalAlign: 'middle', marginRight: 4 }} />Prix unitaire</label><b>{product.unitPrice}</b></div>
+              <div><label><Layers size={11} style={{ verticalAlign: 'middle', marginRight: 4 }} />Quantité totale</label><b>{product.totalQuantity}</b></div>
+              <div><label><Store size={11} style={{ verticalAlign: 'middle', marginRight: 4 }} />Magasins</label><b>{product.stores.length}</b></div>
+              <div><label><AlertTriangle size={11} style={{ verticalAlign: 'middle', marginRight: 4 }} />Statut</label><b><span className={`badge ${statusBadge[product.status]}`}>{statusLabel[product.status]}</span></b></div>
+            </div>
+          </article>
+        ))}
+        {!loading && filteredProducts.length === 0 && <p className="table-empty">Aucun article ne correspond à votre recherche.</p>}
       </div>
 
       {counts.length > 0 && (
@@ -481,8 +489,53 @@ export function StockView() {
       <Modal open={receptionModalOpen} onClose={() => setReceptionModalOpen(false)} title="Réception stock" subtitle="Enregistrez l’arrivée d’articles dans un magasin.">
         <StockReceptionForm storeOptions={storeOptions} productOptions={productOptions} onCreated={refresh} />
       </Modal>
-      <Modal open={editItem !== null} onClose={() => setEditItem(null)} title="Modifier les prix" subtitle="Ajustez le prix de vente et le prix de revient de l’article.">
-        {editItem && <EditPriceForm item={editItem} onSaved={refresh} />}
+      <Modal open={detailProduct !== null} onClose={() => setDetailProduct(null)} title={detailProduct?.name ?? ''} subtitle={detailProduct ? `${detailProduct.sku} · ${detailProduct.category}` : ''} wide>
+        {detailProduct && (
+          <div style={{ display: 'grid', gap: 22 }}>
+            <EditPriceForm item={detailProduct} onSaved={() => { refresh(); setDetailProduct(null) }} />
+            <div style={{ display: 'grid', gap: 20, gridTemplateColumns: 'minmax(220px, 1fr) minmax(280px, 2fr)' }}>
+              <div>
+                <p className="section-title" style={{ marginBottom: 8 }}>Par magasin</p>
+                <table className="data-table">
+                  <thead><tr><th>Magasin</th><th>Qté</th><th>Seuil</th><th>Statut</th></tr></thead>
+                  <tbody>
+                    {detailProduct.stores.map((s) => (
+                      <tr key={s.store}>
+                        <td data-label="Magasin">{s.store}</td>
+                        <td data-label="Qté">{s.quantity}</td>
+                        <td data-label="Seuil">{s.threshold}</td>
+                        <td data-label="Statut"><span className={`badge ${statusBadge[s.status]}`}>{statusLabel[s.status]}</span></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div>
+                <p className="section-title" style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Truck size={13} /> Historique fournisseurs
+                </p>
+                {detailProduct.deliveries.length === 0 ? (
+                  <p className="table-empty">Aucune livraison enregistrée pour ce produit.</p>
+                ) : (
+                  <table className="data-table">
+                    <thead><tr><th>Date</th><th>Fournisseur</th><th>Magasin</th><th>Qté</th><th>Montant</th></tr></thead>
+                    <tbody>
+                      {detailProduct.deliveries.map((d, index) => (
+                        <tr key={index}>
+                          <td data-label="Date">{new Date(d.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+                          <td data-label="Fournisseur">{d.supplierName}</td>
+                          <td data-label="Magasin">{d.store}</td>
+                          <td data-label="Qté">{d.sackCount}{d.tonnage ? ` (${d.tonnage} t)` : ''}</td>
+                          <td data-label="Montant">{d.totalAmountFormatted}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </Modal>
     </AppShell>
   )
