@@ -3,12 +3,12 @@ import { getStoreOptions, getTreasuryOverview } from '@/lib/db/queries'
 import { recordPayment } from '@/lib/db/mutations'
 import { toApiErrorMessage } from '@/lib/api-error'
 import { parsePeriodLabel } from '@/lib/period'
-import { getSessionContext, isAdmin } from '@/lib/session'
+import { getSessionContext, hasPermission, isAdmin } from '@/lib/session'
 
 export async function GET(request: NextRequest) {
   const ctx = await getSessionContext()
   if (!ctx) return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 })
-  if (!isAdmin(ctx)) return NextResponse.json({ error: 'Réservé aux administrateurs.' }, { status: 403 })
+  if (!hasPermission(ctx, 'treasury')) return NextResponse.json({ error: 'Permission "Caisse & Trésorerie" requise.' }, { status: 403 })
 
   const searchParams = request.nextUrl.searchParams
   const period = parsePeriodLabel(searchParams.get('period'), '7d')

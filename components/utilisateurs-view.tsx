@@ -1,14 +1,15 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Pencil, Plus, ShieldCheck, Trash2, Users } from 'lucide-react'
+import { KeyRound, Pencil, Plus, ShieldCheck, Trash2, Users } from 'lucide-react'
 import { AppShell } from '@/components/app-shell'
 import { Modal } from '@/components/modal'
 import { LoadError } from '@/components/load-error'
 import { authClient } from '@/lib/auth-client'
 import { fetchJson } from '@/lib/fetch-json'
+import { PERMISSIONS, permissionLabel, permissionHelp, type Permission } from '@/lib/permissions'
 
-type UserRow = { id: string; name: string; email: string; role: string; storeId: number | null; store: string }
+type UserRow = { id: string; name: string; email: string; role: string; storeId: number | null; store: string; permissions: Permission[] }
 type StoreOption = { id: number; name: string }
 
 const roleLabel: Record<string, string> = { admin: 'Administrateur', gestionnaire: 'Gestionnaire' }
@@ -24,12 +25,43 @@ function MetricCard({ label, value, icon: Icon, tone }: { label: string; value: 
   )
 }
 
+/** The checkbox grid shared by create/edit — a gestionnaire's access is whatever is checked here, nothing more. */
+function PermissionCheckboxes({ permissions, onChange }: { permissions: Permission[]; onChange: (next: Permission[]) => void }) {
+  function toggle(permission: Permission) {
+    onChange(permissions.includes(permission) ? permissions.filter((p) => p !== permission) : [...permissions, permission])
+  }
+
+  return (
+    <div className="form-field">
+      <label>Permissions</label>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '8px 16px', marginTop: 4 }}>
+        {PERMISSIONS.map((permission) => (
+          <label
+            key={permission}
+            title={permissionHelp[permission]}
+            style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 11.5, fontWeight: 400, color: 'var(--ink)', cursor: 'pointer' }}
+          >
+            <input
+              type="checkbox"
+              checked={permissions.includes(permission)}
+              onChange={() => toggle(permission)}
+              style={{ width: 14, height: 14, marginTop: 1, flexShrink: 0 }}
+            />
+            {permissionLabel[permission]}
+          </label>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function NewUserForm({ storeOptions, onCreated }: { storeOptions: StoreOption[]; onCreated: () => void }) {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [role, setRole] = useState<'admin' | 'gestionnaire'>('gestionnaire')
   const [storeId, setStoreId] = useState('')
+  const [permissions, setPermissions] = useState<Permission[]>([])
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
@@ -45,7 +77,7 @@ function NewUserForm({ storeOptions, onCreated }: { storeOptions: StoreOption[];
       const res = await fetch('/api/utilisateurs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password, role, storeId: role === 'gestionnaire' ? storeId : null }),
+        body: JSON.stringify({ name, email, password, role, storeId: role === 'gestionnaire' ? storeId : null, permissions }),
       })
       const json = await res.json()
       if (!res.ok) {
@@ -83,6 +115,7 @@ function NewUserForm({ storeOptions, onCreated }: { storeOptions: StoreOption[];
           </div>
         )}
       </div>
+      {role === 'gestionnaire' && <PermissionCheckboxes permissions={permissions} onChange={setPermissions} />}
       <div className="form-actions"><button type="submit" className="btn-primary" disabled={submitting}>{submitting ? 'Création...' : 'Créer le compte'}</button></div>
     </form>
   )
@@ -99,6 +132,7 @@ function EditUserForm({
 }) {
   const [role, setRole] = useState<'admin' | 'gestionnaire'>(targetUser.role === 'admin' ? 'admin' : 'gestionnaire')
   const [storeId, setStoreId] = useState(targetUser.storeId ? String(targetUser.storeId) : '')
+  const [permissions, setPermissions] = useState<Permission[]>(targetUser.permissions)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
@@ -114,7 +148,7 @@ function EditUserForm({
       const res = await fetch(`/api/utilisateurs/${targetUser.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role, storeId: role === 'gestionnaire' ? storeId : null }),
+        body: JSON.stringify({ role, storeId: role === 'gestionnaire' ? storeId : null, permissions }),
       })
       const json = await res.json()
       if (!res.ok) {
@@ -151,7 +185,60 @@ function EditUserForm({
           </div>
         )}
       </div>
+      {role === 'gestionnaire' && <PermissionCheckboxes permissions={permissions} onChange={setPermissions} />}
       <div className="form-actions"><button type="submit" className="btn-primary" disabled={submitting}>{submitting ? 'Enregistrement...' : 'Enregistrer'}</button></div>
+    </form>
+  )
+}
+
+function ResetPasswordForm({ targetUser, onDone }: { targetUser: UserRow; onDone: () => void }) {
+  const [newPassword, setNewPassword] = useState('')
+  const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [done, setDone] = useState(false)
+
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault()
+    setError('')
+    setSubmitting(true)
+    try {
+      const res = await fetch(`/api/utilisateurs/${targetUser.id}/password`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newPassword }),
+      })
+      const json = await res.json()
+      if (!res.ok) {
+        setError(json.error ?? 'Une erreur est survenue.')
+        return
+      }
+      setDone(true)
+    } catch {
+      setError('Connexion instable — impossible de contacter le serveur. Réessayez.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  if (done) {
+    return (
+      <div>
+        <p style={{ fontSize: 12.5, color: 'var(--ink)', marginBottom: 16 }}>
+          Mot de passe mis à jour pour <strong>{targetUser.email}</strong>. Communiquez-le à la personne par un canal sûr — il ne sera plus affiché après fermeture.
+        </p>
+        <div className="form-actions"><button type="button" className="btn-primary" onClick={onDone}>Fermer</button></div>
+      </div>
+    )
+  }
+
+  return (
+    <form onSubmit={handleSubmit}>
+      {error && <p className="form-error">{error}</p>}
+      <p style={{ fontSize: 11.5, color: 'var(--muted)', marginBottom: 14 }}>
+        Définissez un nouveau mot de passe pour <strong>{targetUser.email}</strong>. Pas d’e-mail envoyé — communiquez-le vous-même à la personne.
+      </p>
+      <div className="form-field"><label>Nouveau mot de passe</label><input required type="password" minLength={8} value={newPassword} onChange={(event) => setNewPassword(event.target.value)} /></div>
+      <div className="form-actions"><button type="submit" className="btn-primary" disabled={submitting}>{submitting ? 'Enregistrement...' : 'Réinitialiser'}</button></div>
     </form>
   )
 }
@@ -164,6 +251,7 @@ export function UtilisateursView() {
   const [error, setError] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<UserRow | null>(null)
+  const [resettingUser, setResettingUser] = useState<UserRow | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [deleteError, setDeleteError] = useState('')
   const [refreshKey, setRefreshKey] = useState(0)
@@ -241,6 +329,7 @@ export function UtilisateursView() {
                 <th>E-mail</th>
                 <th>Rôle</th>
                 <th>Magasin</th>
+                <th>Permissions</th>
                 <th></th>
               </tr>
             </thead>
@@ -253,7 +342,19 @@ export function UtilisateursView() {
                     <td data-label="E-mail">{row.email}</td>
                     <td data-label="Rôle"><span className={`badge ${roleBadge[row.role] ?? 'badge-muted'}`}>{roleLabel[row.role] ?? row.role}</span></td>
                     <td data-label="Magasin">{row.role === 'admin' ? 'Tous les magasins' : row.store}</td>
+                    <td data-label="Permissions" style={{ fontSize: 10.5, color: 'var(--muted)', maxWidth: 220 }}>
+                      {row.role === 'admin' ? 'Toutes' : row.permissions.length > 0 ? row.permissions.map((p) => permissionLabel[p]).join(', ') : '—'}
+                    </td>
                     <td data-label="" style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        className="icon-button"
+                        title="Réinitialiser le mot de passe"
+                        aria-label={`Réinitialiser le mot de passe de ${row.name}`}
+                        onClick={() => setResettingUser(row)}
+                      >
+                        <KeyRound size={14} />
+                      </button>
                       <button
                         type="button"
                         className="icon-button"
@@ -297,13 +398,25 @@ export function UtilisateursView() {
         />
       </Modal>
 
-      <Modal open={editingUser !== null} onClose={() => setEditingUser(null)} title="Modifier l’utilisateur" subtitle="Changez le rôle ou le magasin assigné.">
+      <Modal open={editingUser !== null} onClose={() => setEditingUser(null)} title="Modifier l’utilisateur" subtitle="Changez le rôle, le magasin ou les permissions.">
         {editingUser && (
           <EditUserForm
             targetUser={editingUser}
             storeOptions={storeOptions}
             onSaved={() => {
               setEditingUser(null)
+              setRefreshKey((key) => key + 1)
+            }}
+          />
+        )}
+      </Modal>
+
+      <Modal open={resettingUser !== null} onClose={() => setResettingUser(null)} title="Réinitialiser le mot de passe" subtitle="Pour un compte qui a oublié son mot de passe.">
+        {resettingUser && (
+          <ResetPasswordForm
+            targetUser={resettingUser}
+            onDone={() => {
+              setResettingUser(null)
               setRefreshKey((key) => key + 1)
             }}
           />

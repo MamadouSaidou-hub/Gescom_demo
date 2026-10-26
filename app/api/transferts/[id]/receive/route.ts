@@ -4,11 +4,12 @@ import { withTenant } from '@/lib/db/tenant'
 import { transfers } from '@/lib/db/schema'
 import { receiveTransfer } from '@/lib/db/mutations'
 import { toApiErrorMessage } from '@/lib/api-error'
-import { getSessionContext, isAdmin } from '@/lib/session'
+import { getSessionContext, hasPermission, isAdmin } from '@/lib/session'
 
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const ctx = await getSessionContext()
   if (!ctx) return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 })
+  if (!hasPermission(ctx, 'transfers')) return NextResponse.json({ error: 'Permission "Transferts entre magasins" requise.' }, { status: 403 })
 
   const { id } = await params
   const transferId = Number(id)

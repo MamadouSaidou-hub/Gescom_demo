@@ -3,7 +3,7 @@ import { withTenant } from '@/lib/db/tenant'
 import { products } from '@/lib/db/schema'
 import { createProduct } from '@/lib/db/mutations'
 import { toApiErrorMessage } from '@/lib/api-error'
-import { getSessionContext } from '@/lib/session'
+import { getSessionContext, hasPermission } from '@/lib/session'
 import { eq } from 'drizzle-orm'
 
 export async function GET() {
@@ -19,6 +19,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   const ctx = await getSessionContext()
   if (!ctx) return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 })
+  if (!hasPermission(ctx, 'products')) return NextResponse.json({ error: 'Permission "Produits & prix" requise.' }, { status: 403 })
 
   const body = await request.json()
   const name = String(body.name ?? '').trim()

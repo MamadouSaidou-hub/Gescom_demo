@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getDiscountHistory, getDiscountScale } from '@/lib/db/queries'
 import { setDiscountTiers, type PartyType } from '@/lib/db/mutations'
 import { toApiErrorMessage } from '@/lib/api-error'
-import { getSessionContext, isAdmin } from '@/lib/session'
+import { getSessionContext, hasPermission } from '@/lib/session'
 
 function parseParty(partyType: string, partyId: string): PartyType | null {
   if (partyType !== 'client' && partyType !== 'supplier') return null
@@ -13,7 +13,7 @@ function parseParty(partyType: string, partyId: string): PartyType | null {
 export async function GET(_request: Request, { params }: { params: Promise<{ partyType: string; partyId: string }> }) {
   const ctx = await getSessionContext()
   if (!ctx) return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 })
-  if (!isAdmin(ctx)) return NextResponse.json({ error: 'Réservé aux administrateurs.' }, { status: 403 })
+  if (!hasPermission(ctx, 'discounts')) return NextResponse.json({ error: 'Permission "Remises & barèmes" requise.' }, { status: 403 })
 
   const { partyType, partyId } = await params
   const type = parseParty(partyType, partyId)
@@ -26,7 +26,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ par
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ partyType: string; partyId: string }> }) {
   const ctx = await getSessionContext()
   if (!ctx) return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 })
-  if (!isAdmin(ctx)) return NextResponse.json({ error: 'Réservé aux administrateurs.' }, { status: 403 })
+  if (!hasPermission(ctx, 'discounts')) return NextResponse.json({ error: 'Permission "Remises & barèmes" requise.' }, { status: 403 })
 
   const { partyType, partyId } = await params
   const type = parseParty(partyType, partyId)

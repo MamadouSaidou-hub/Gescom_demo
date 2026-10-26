@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { effectiveStoreParam, isAdmin, scopedStoreList, type SessionContext } from '@/lib/session'
 
 function ctx(overrides: Partial<SessionContext> = {}): SessionContext {
-  return { userId: 'u1', email: 'u1@test.local', role: 'gestionnaire', tenantId: 1, storeId: null, storeName: null, platformAdmin: false, ...overrides }
+  return { userId: 'u1', email: 'u1@test.local', role: 'gestionnaire', tenantId: 1, storeId: null, storeName: null, platformAdmin: false, permissions: [], ...overrides }
 }
 
 describe('isAdmin', () => {

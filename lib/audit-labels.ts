@@ -10,6 +10,7 @@ export type AuditAction =
   | 'user.created'
   | 'user.role_changed'
   | 'user.deleted'
+  | 'user.password_reset'
   | 'tenant.created'
   | 'tenant.suspended'
   | 'tenant.reactivated'
@@ -18,6 +19,7 @@ export const auditActionLabel: Record<AuditAction, string> = {
   'user.created': 'Compte créé',
   'user.role_changed': 'Rôle modifié',
   'user.deleted': 'Compte supprimé',
+  'user.password_reset': 'Mot de passe réinitialisé',
   'tenant.created': 'Client créé',
   'tenant.suspended': 'Client suspendu',
   'tenant.reactivated': 'Client réactivé',

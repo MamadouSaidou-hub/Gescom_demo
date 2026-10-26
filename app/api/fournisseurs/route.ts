@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSuppliersOverview } from '@/lib/db/queries'
 import { createSupplier } from '@/lib/db/mutations'
 import { toApiErrorMessage } from '@/lib/api-error'
-import { getSessionContext, isAdmin } from '@/lib/session'
+import { getSessionContext, hasPermission } from '@/lib/session'
 import { csvResponse } from '@/lib/csv'
 
 export async function GET(request: NextRequest) {
   const ctx = await getSessionContext()
   if (!ctx) return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 })
-  if (!isAdmin(ctx)) return NextResponse.json({ error: 'Réservé aux administrateurs.' }, { status: 403 })
+  if (!hasPermission(ctx, 'suppliers')) return NextResponse.json({ error: 'Permission "Fournisseurs" requise.' }, { status: 403 })
 
   const data = await getSuppliersOverview(ctx.tenantId)
 
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const ctx = await getSessionContext()
   if (!ctx) return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 })
-  if (!isAdmin(ctx)) return NextResponse.json({ error: 'Réservé aux administrateurs.' }, { status: 403 })
+  if (!hasPermission(ctx, 'suppliers')) return NextResponse.json({ error: 'Permission "Fournisseurs" requise.' }, { status: 403 })
 
   const body = await request.json()
   const name = String(body.name ?? '').trim()

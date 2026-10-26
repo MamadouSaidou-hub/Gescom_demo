@@ -19,6 +19,10 @@ export const user = pgTable(
     image: text('image'),
     role: text('role').notNull().default('gestionnaire'),
     storeId: integer('store_id').references(() => stores.id, { onDelete: 'set null' }),
+    // Comma-joined list of lib/permissions.ts keys — only meaningful for role='gestionnaire'
+    // (an 'admin' always has full access regardless of this value). Plain text, not a Postgres
+    // array, so it works as a better-auth additionalField without array-type plumbing.
+    permissions: text('permissions').notNull().default(''),
     // Platform operator (us), not a tenant's own admin — can create/list tenants across the whole
     // platform. Deliberately separate from `role`/tenant scoping; never settable via user input.
     platformAdmin: boolean('platform_admin').notNull().default(false),

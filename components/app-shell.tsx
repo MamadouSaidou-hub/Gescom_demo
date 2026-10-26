@@ -30,21 +30,26 @@ import { authClient } from '@/lib/auth-client'
 import { AppearanceMenu } from '@/components/appearance-menu'
 import { NotificationMenu } from '@/components/notification-menu'
 import { useSettings } from '@/components/settings-provider'
+import { parsePermissions, type Permission } from '@/lib/permissions'
 
+// `permission` hides the link entirely unless the account was granted it (or is admin — an admin
+// always has every permission). `adminOnly` is for areas tied to the structural admin role itself
+// (user management, company settings) rather than a togglable feature permission — see
+// lib/permissions.ts for why those two are different gates.
 const navItems = [
   { href: '/', label: 'Tableau de bord', icon: LayoutDashboard, adminOnly: false },
   { href: '/ventes', label: 'Ventes', icon: ShoppingCart, adminOnly: false },
   { href: '/stock', label: 'Stock', icon: Package, adminOnly: false },
-  { href: '/transferts', label: 'Transferts', icon: ArrowLeftRight, adminOnly: false },
-  { href: '/tresorerie', label: 'Trésorerie', icon: WalletCards, adminOnly: true },
+  { href: '/transferts', label: 'Transferts', icon: ArrowLeftRight, adminOnly: false, permission: 'transfers' as Permission },
+  { href: '/tresorerie', label: 'Trésorerie', icon: WalletCards, adminOnly: false, permission: 'treasury' as Permission },
 ]
 
 const gestionItems = [
   { href: '/magasins', label: 'Magasins', icon: Store, adminOnly: true },
   { href: '/clients', label: 'Clients & créances', icon: Users, adminOnly: false },
-  { href: '/fournisseurs', label: 'Fournisseurs', icon: Truck, adminOnly: true },
-  { href: '/caisse', label: 'Caisse & Dépenses', icon: Banknote, adminOnly: true },
-  { href: '/rapports', label: 'Rapports', icon: ReceiptText, adminOnly: true },
+  { href: '/fournisseurs', label: 'Fournisseurs', icon: Truck, adminOnly: false, permission: 'suppliers' as Permission },
+  { href: '/caisse', label: 'Caisse & Dépenses', icon: Banknote, adminOnly: false, permission: 'treasury' as Permission },
+  { href: '/rapports', label: 'Rapports', icon: ReceiptText, adminOnly: false, permission: 'reports' as Permission },
   { href: '/utilisateurs', label: 'Utilisateurs', icon: UserCog, adminOnly: true },
   { href: '/parametres', label: 'Paramètres', icon: Settings, adminOnly: true },
 ]
@@ -254,6 +259,9 @@ export function AppShell({
   const { data: session } = authClient.useSession()
   const isAdmin = session?.user?.role === 'admin'
   const isPlatformAdmin = (session?.user as { platformAdmin?: boolean } | undefined)?.platformAdmin === true
+  const permissions = parsePermissions((session?.user as { permissions?: string } | undefined)?.permissions)
+  const canSee = (item: { adminOnly: boolean; permission?: Permission }) =>
+    (isAdmin || !item.adminOnly) && (isAdmin || !item.permission || permissions.includes(item.permission))
   const { companyName, companyShortName } = useSettings()
 
   return (
@@ -268,13 +276,13 @@ export function AppShell({
         <div className="workspace-select"><span className="workspace-dot" /><span>Direction générale</span><ChevronDown aria-hidden="true" /></div>
         <nav className="nav-list" aria-label="Navigation principale">
           <p className="nav-caption">PILOTAGE</p>
-          {navItems.filter((item) => isAdmin || !item.adminOnly).map((item) => (
+          {navItems.filter(canSee).map((item) => (
             <Link key={item.href} className={`nav-link ${pathname === item.href ? 'active' : ''}`} href={item.href}>
               <item.icon />{item.label}
             </Link>
           ))}
           <p className="nav-caption nav-caption-spaced">GESTION</p>
-          {gestionItems.filter((item) => isAdmin || !item.adminOnly).map((item) => (
+          {gestionItems.filter(canSee).map((item) => (
             <Link key={item.href} className={`nav-link ${pathname === item.href ? 'active' : ''}`} href={item.href}>
               <item.icon />{item.label}
             </Link>

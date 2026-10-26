@@ -4,6 +4,7 @@ import { auth } from './auth'
 import { db } from './db/client'
 import { stores, tenants } from './db/schema'
 import { withTenant } from './db/tenant'
+import { parsePermissions, type Permission } from './permissions'
 
 // Suspension has to be checked on every request (not just at login) or a suspended client keeps
 // working until their session expires. Cached briefly so this doesn't add a query to every single
@@ -34,6 +35,8 @@ export type SessionContext = {
   storeId: number | null
   storeName: string | null
   platformAdmin: boolean
+  /** Only meaningful for a 'gestionnaire' — an admin always passes hasPermission() regardless. */
+  permissions: Permission[]
 }
 
 /**
@@ -77,6 +80,7 @@ export async function getSessionState(): Promise<SessionState> {
       storeId,
       storeName,
       platformAdmin: (session.user as { platformAdmin?: boolean }).platformAdmin ?? false,
+      permissions: parsePermissions((session.user as { permissions?: string }).permissions),
     },
   }
 }
@@ -92,6 +96,11 @@ export function isAdmin(ctx: SessionContext) {
 
 export function isPlatformAdmin(ctx: SessionContext) {
   return ctx.platformAdmin === true
+}
+
+/** An admin always has every permission; a gestionnaire only has what's been explicitly granted. */
+export function hasPermission(ctx: SessionContext, permission: Permission) {
+  return isAdmin(ctx) || ctx.permissions.includes(permission)
 }
 
 export function assertStoreAccess(ctx: SessionContext, storeId: number) {

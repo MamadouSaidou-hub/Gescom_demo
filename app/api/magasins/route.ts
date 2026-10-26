@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getStoresOverview } from '@/lib/db/queries'
 import { createStore } from '@/lib/db/mutations'
 import { toApiErrorMessage } from '@/lib/api-error'
-import { getSessionContext, isAdmin } from '@/lib/session'
+import { getSessionContext, hasPermission, isAdmin } from '@/lib/session'
 
 export async function GET() {
   const ctx = await getSessionContext()
@@ -16,7 +16,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   const ctx = await getSessionContext()
   if (!ctx) return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 })
-  if (!isAdmin(ctx)) return NextResponse.json({ error: 'Réservé aux administrateurs.' }, { status: 403 })
+  if (!hasPermission(ctx, 'stores')) return NextResponse.json({ error: 'Permission "Magasins" requise.' }, { status: 403 })
 
   const body = await request.json()
   const name = String(body.name ?? '').trim()

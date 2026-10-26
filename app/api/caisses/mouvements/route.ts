@@ -3,12 +3,12 @@ import { recordCashMovement } from '@/lib/db/mutations'
 import { cashMovementType } from '@/lib/db/schema'
 import { toApiErrorMessage } from '@/lib/api-error'
 import { isExpenseCategory } from '@/lib/expense-categories'
-import { getSessionContext, isAdmin } from '@/lib/session'
+import { getSessionContext, hasPermission } from '@/lib/session'
 
 export async function POST(request: NextRequest) {
   const ctx = await getSessionContext()
   if (!ctx) return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 })
-  if (!isAdmin(ctx)) return NextResponse.json({ error: 'Réservé aux administrateurs.' }, { status: 403 })
+  if (!hasPermission(ctx, 'treasury')) return NextResponse.json({ error: 'Permission "Caisse & Trésorerie" requise.' }, { status: 403 })
 
   const body = await request.json()
   const cashAccountId = Number(body.cashAccountId)

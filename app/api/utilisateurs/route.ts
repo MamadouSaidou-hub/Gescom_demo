@@ -9,6 +9,7 @@ import { withTenant } from '@/lib/db/tenant'
 import { toApiErrorMessage } from '@/lib/api-error'
 import { recordAuditEvent } from '@/lib/audit'
 import { getSessionContext, isAdmin } from '@/lib/session'
+import { parsePermissions, serializePermissions } from '@/lib/permissions'
 
 export async function GET() {
   const ctx = await getSessionContext()
@@ -19,7 +20,7 @@ export async function GET() {
   // filter is not defense-in-depth here — it's the only thing preventing this endpoint from
   // listing every tenant's users.
   const userRows = await db
-    .select({ id: user.id, name: user.name, email: user.email, role: user.role, storeId: user.storeId })
+    .select({ id: user.id, name: user.name, email: user.email, role: user.role, storeId: user.storeId, permissions: user.permissions })
     .from(user)
     .where(eq(user.tenantId, ctx.tenantId))
   const storeRows = await withTenant(ctx.tenantId, (tx) => tx.select({ id: stores.id, name: stores.name }).from(stores))
@@ -33,6 +34,7 @@ export async function GET() {
       role: row.role,
       storeId: row.storeId,
       store: row.storeId ? storeMap.get(row.storeId) ?? '—' : '—',
+      permissions: parsePermissions(row.permissions),
     })),
   })
 }
@@ -48,6 +50,7 @@ export async function POST(request: NextRequest) {
   const password = String(body.password ?? '')
   const role = body.role === 'admin' ? 'admin' : 'gestionnaire'
   const storeId = body.storeId ? Number(body.storeId) : null
+  const permissions = Array.isArray(body.permissions) ? parsePermissions(body.permissions.join(',')) : []
 
   if (!name || !email || password.length < 8) {
     return NextResponse.json({ error: 'Nom, e-mail et mot de passe (8 caractères min.) sont requis.' }, { status: 400 })
@@ -66,12 +69,19 @@ export async function POST(request: NextRequest) {
       body: { name, email, password, role: role as 'admin', data: { tenantId: ctx.tenantId, storeId } },
       headers: await headers(),
     })
+    // Set separately rather than via `data` above — permissions are only meaningful for a
+    // gestionnaire, and keeping this as a plain follow-up update avoids relying on whether
+    // better-auth's createUser actually persists an additionalField not in its own `data` schema
+    // validation path for this specific endpoint.
+    if (role === 'gestionnaire' && permissions.length > 0) {
+      await db.update(user).set({ permissions: serializePermissions(permissions) }).where(eq(user.id, created.user.id))
+    }
     await recordAuditEvent({
       actor: ctx,
       action: 'user.created',
       targetType: 'user',
       targetId: created.user.id,
-      payload: { email, name, role, storeId },
+      payload: { email, name, role, storeId, permissions: role === 'gestionnaire' ? permissions : undefined },
     })
     return NextResponse.json({ ok: true }, { status: 201 })
   } catch (error) {

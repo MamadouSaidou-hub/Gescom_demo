@@ -3,12 +3,13 @@ import { getStoreOptions, getTransfersList } from '@/lib/db/queries'
 import { createTransfer } from '@/lib/db/mutations'
 import { toApiErrorMessage } from '@/lib/api-error'
 import { parsePeriodLabel } from '@/lib/period'
-import { effectiveStoreParam, getSessionContext, isAdmin, scopedStoreList } from '@/lib/session'
+import { effectiveStoreParam, getSessionContext, hasPermission, isAdmin, scopedStoreList } from '@/lib/session'
 import { csvResponse } from '@/lib/csv'
 
 export async function GET(request: NextRequest) {
   const ctx = await getSessionContext()
   if (!ctx) return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 })
+  if (!hasPermission(ctx, 'transfers')) return NextResponse.json({ error: 'Permission "Transferts entre magasins" requise.' }, { status: 403 })
 
   const searchParams = request.nextUrl.searchParams
   const period = parsePeriodLabel(searchParams.get('period'), '7d')
@@ -40,6 +41,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const ctx = await getSessionContext()
   if (!ctx) return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 })
+  if (!hasPermission(ctx, 'transfers')) return NextResponse.json({ error: 'Permission "Transferts entre magasins" requise.' }, { status: 403 })
 
   const body = await request.json()
   const fromStoreId = Number(body.fromStoreId)

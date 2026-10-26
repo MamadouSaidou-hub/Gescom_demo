@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { updateProduct } from '@/lib/db/mutations'
 import { toApiErrorMessage } from '@/lib/api-error'
-import { getSessionContext, isAdmin } from '@/lib/session'
+import { getSessionContext, hasPermission } from '@/lib/session'
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const ctx = await getSessionContext()
   if (!ctx) return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 })
-  if (!isAdmin(ctx)) return NextResponse.json({ error: 'Réservé aux administrateurs.' }, { status: 403 })
+  if (!hasPermission(ctx, 'products')) return NextResponse.json({ error: 'Permission "Produits & prix" requise.' }, { status: 403 })
 
   const { id } = await params
   const productId = Number(id)

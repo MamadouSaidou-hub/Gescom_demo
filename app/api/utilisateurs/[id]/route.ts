@@ -7,6 +7,7 @@ import { user } from '@/lib/db/auth-schema'
 import { toApiErrorMessage } from '@/lib/api-error'
 import { recordAuditEvent } from '@/lib/audit'
 import { getSessionContext, isAdmin } from '@/lib/session'
+import { parsePermissions, serializePermissions } from '@/lib/permissions'
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const ctx = await getSessionContext()
@@ -18,7 +19,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   // `user` has no RLS, so this is the only thing stopping an admin from modifying an account in
   // a different tenant (e.g. promoting it to admin, reassigning its store).
   const [target] = await db
-    .select({ tenantId: user.tenantId, email: user.email, role: user.role, storeId: user.storeId })
+    .select({ tenantId: user.tenantId, email: user.email, role: user.role, storeId: user.storeId, permissions: user.permissions })
     .from(user)
     .where(eq(user.id, id))
   if (!target || target.tenantId !== ctx.tenantId) {
@@ -28,6 +29,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const body = await request.json()
   const role = body.role === 'admin' ? 'admin' : 'gestionnaire'
   const storeId = body.storeId ? Number(body.storeId) : null
+  const permissions = Array.isArray(body.permissions) ? parsePermissions(body.permissions.join(',')) : []
 
   if (role === 'gestionnaire' && !storeId) {
     return NextResponse.json({ error: 'Un magasin est requis pour un gestionnaire.' }, { status: 400 })
@@ -38,10 +40,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   try {
     // better-auth's admin plugin owns the `role` column (keeps its session cache consistent); `storeId`
-    // is a plain app-level field it doesn't know about, so it's updated directly — same pattern as
-    // lib/db/seed-admin.ts.
+    // and `permissions` are plain app-level fields it doesn't know about, so they're updated directly
+    // — same pattern as lib/db/seed-admin.ts.
     await auth.api.setRole({ body: { userId: id, role: role as 'admin' }, headers: await headers() })
-    await db.update(user).set({ storeId: role === 'admin' ? null : storeId }).where(eq(user.id, id))
+    const nextPermissions = role === 'admin' ? '' : serializePermissions(permissions)
+    await db.update(user).set({ storeId: role === 'admin' ? null : storeId, permissions: nextPermissions }).where(eq(user.id, id))
+    const previousPermissions = parsePermissions(target.permissions)
     await recordAuditEvent({
       actor: ctx,
       action: 'user.role_changed',
@@ -53,6 +57,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         newRole: role,
         previousStoreId: target.storeId,
         newStoreId: role === 'admin' ? null : storeId,
+        previousPermissions: previousPermissions.length > 0 ? previousPermissions : undefined,
+        newPermissions: permissions.length > 0 ? permissions : undefined,
       },
     })
     return NextResponse.json({ ok: true })
