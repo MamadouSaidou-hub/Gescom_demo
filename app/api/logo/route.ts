@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { companyInfo } from '@/lib/company-info'
-import { ensureSettingsLoaded } from '@/lib/settings-cache'
+import { getDefaultBranding, getTenantBranding } from '@/lib/settings-cache'
+import { getSessionContext } from '@/lib/session'
 
 // A stable URL for the current logo — static file by default, or the uploaded data: URL once a
 // client sets one from Paramètres. Keeping this as a dedicated endpoint (rather than threading a
 // ~1MB base64 string through the React settings context) avoids bloating every single page's payload
 // with logo bytes it may not even render.
 export async function GET(request: NextRequest) {
-  await ensureSettingsLoaded()
-  const logo = companyInfo.logoPath
+  const ctx = await getSessionContext()
+  const branding = ctx ? await getTenantBranding(ctx.tenantId) : getDefaultBranding()
+  const logo = branding.logoPath
 
   if (!logo.startsWith('data:')) {
     return NextResponse.redirect(new URL(logo, request.url), 307)

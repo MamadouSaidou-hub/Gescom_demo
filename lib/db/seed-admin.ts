@@ -1,3 +1,6 @@
+// Superseded by scripts/create-tenant.ts now that every user needs a tenantId (NOT NULL, no
+// default) — this script has no tenant to assign and will fail the DB constraint if run.
+// Kept only as a reference for the pre-multi-tenant seeding pattern.
 import { eq } from 'drizzle-orm'
 import { auth } from '../auth'
 import { db } from './client'

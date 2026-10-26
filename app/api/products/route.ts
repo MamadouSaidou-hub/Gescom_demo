@@ -1,15 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db/client'
+import { withTenant } from '@/lib/db/tenant'
 import { products } from '@/lib/db/schema'
 import { createProduct } from '@/lib/db/mutations'
 import { toApiErrorMessage } from '@/lib/api-error'
+import { getSessionContext } from '@/lib/session'
+import { eq } from 'drizzle-orm'
 
 export async function GET() {
-  const rows = await db.select().from(products).orderBy(products.name)
+  const ctx = await getSessionContext()
+  if (!ctx) return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 })
+
+  const rows = await withTenant(ctx.tenantId, async (tx) =>
+    tx.select().from(products).where(eq(products.tenantId, ctx.tenantId)).orderBy(products.name),
+  )
   return NextResponse.json({ products: rows })
 }
 
 export async function POST(request: NextRequest) {
+  const ctx = await getSessionContext()
+  if (!ctx) return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 })
+
   const body = await request.json()
   const name = String(body.name ?? '').trim()
   const sku = body.sku ? String(body.sku).trim() : undefined
@@ -23,7 +33,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const product = await createProduct({
+    const product = await createProduct(ctx.tenantId, {
       name,
       sku,
       category,

@@ -1,26 +1,29 @@
 import { and, eq, sql } from 'drizzle-orm'
-import { db } from '../client'
+import { withTenant } from '../tenant'
 import { payments, paymentMethod, products, receivables, saleItems, sales, stockLevels, stockMovements } from '../schema'
 import { getQuantity } from './shared'
 import { businessConfig } from '@/lib/business-config'
 import { recordAutoCashMovement } from './cash-accounts'
 
-export async function createSale(input: {
-  storeId: number
-  clientId?: number | null
-  paymentStatus: 'paid' | 'partial' | 'credit'
-  paidNow: number
-  method?: (typeof paymentMethod)[number]
-  dueInDays: number
-  items: { productId: number; quantity: number; unit?: 'sack' | 'tonne'; tonnage?: number }[]
-}) {
+export async function createSale(
+  tenantId: number,
+  input: {
+    storeId: number
+    clientId?: number | null
+    paymentStatus: 'paid' | 'partial' | 'credit'
+    paidNow: number
+    method?: (typeof paymentMethod)[number]
+    dueInDays: number
+    items: { productId: number; quantity: number; unit?: 'sack' | 'tonne'; tonnage?: number }[]
+  },
+) {
   if (input.items.length === 0) {
     throw new Error('Une vente doit contenir au moins un article.')
   }
   const method = input.method ?? 'cash'
 
-  const sale = await db.transaction(async (tx) => {
-    const productRows = await tx.select().from(products)
+  const sale = await withTenant(tenantId, async (tx) => {
+    const productRows = await tx.select().from(products).where(eq(products.tenantId, tenantId))
     const productMap = new Map(productRows.map((product) => [product.id, product]))
 
     const items = input.items.map((item) => {
@@ -46,7 +49,7 @@ export async function createSale(input: {
     })
 
     for (const item of items) {
-      const available = await getQuantity(tx, item.productId, input.storeId)
+      const available = await getQuantity(tx, tenantId, item.productId, input.storeId)
       if (available < item.quantity) {
         const product = productMap.get(item.productId)
         throw new Error(`Stock insuffisant pour ${product?.name ?? 'cet article'} (disponible : ${available}).`)
@@ -75,6 +78,7 @@ export async function createSale(input: {
         totalAmount,
         costAmount,
         paymentStatus: input.paymentStatus,
+        tenantId,
       })
       .returning()
 
@@ -86,21 +90,23 @@ export async function createSale(input: {
         unitPrice: item.unitPrice,
         unit: item.unit,
         tonnage: item.tonnage,
+        tenantId,
       })),
     )
 
     for (const item of items) {
-      const currentQuantity = await getQuantity(tx, item.productId, input.storeId)
+      const currentQuantity = await getQuantity(tx, tenantId, item.productId, input.storeId)
       await tx
         .update(stockLevels)
         .set({ quantity: currentQuantity - item.quantity })
-        .where(and(eq(stockLevels.productId, item.productId), eq(stockLevels.storeId, input.storeId)))
+        .where(and(eq(stockLevels.productId, item.productId), eq(stockLevels.storeId, input.storeId), eq(stockLevels.tenantId, tenantId)))
       await tx.insert(stockMovements).values({
         type: 'sale',
         productId: item.productId,
         storeId: input.storeId,
         quantity: -item.quantity,
         reference: sale.reference,
+        tenantId,
       })
     }
 
@@ -116,6 +122,7 @@ export async function createSale(input: {
           storeId: input.storeId,
           amount: paidAtSale,
           method,
+          tenantId,
         })
       }
     }
@@ -131,6 +138,7 @@ export async function createSale(input: {
           amount: remaining,
           dueDate: dueDate.toISOString(),
           status: 'pending',
+          tenantId,
         })
       }
     }
@@ -142,7 +150,7 @@ export async function createSale(input: {
   // the sale has actually committed (never want a cash entry for a sale that got rolled back).
   const receivedNow = input.paymentStatus === 'paid' ? sale.totalAmount : input.paymentStatus === 'partial' ? input.paidNow : 0
   if (receivedNow > 0) {
-    await recordAutoCashMovement({
+    await recordAutoCashMovement(tenantId, {
       direction: 'in',
       amount: receivedNow,
       storeId: input.storeId,

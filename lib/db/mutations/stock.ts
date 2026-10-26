@@ -1,15 +1,15 @@
 import { and, eq } from 'drizzle-orm'
-import { db } from '../client'
+import { withTenant } from '../tenant'
 import { stockCounts, stockLevels, stockMovements } from '../schema'
 import { getQuantity } from './shared'
 
-export async function recordStockCount(input: { storeId: number; productId: number; countedQty: number; countedBy: string }) {
+export async function recordStockCount(tenantId: number, input: { storeId: number; productId: number; countedQty: number; countedBy: string }) {
   if (input.countedQty < 0) {
     throw new Error('La quantité comptée ne peut pas être négative.')
   }
 
-  return db.transaction(async (tx) => {
-    const theoreticalQty = await getQuantity(tx, input.productId, input.storeId)
+  return withTenant(tenantId, async (tx) => {
+    const theoreticalQty = await getQuantity(tx, tenantId, input.productId, input.storeId)
     const variance = input.countedQty - theoreticalQty
 
     await tx.insert(stockCounts).values({
@@ -19,12 +19,13 @@ export async function recordStockCount(input: { storeId: number; productId: numb
       countedQty: input.countedQty,
       variance,
       countedBy: input.countedBy,
+      tenantId,
     })
 
     await tx
       .update(stockLevels)
       .set({ quantity: input.countedQty })
-      .where(and(eq(stockLevels.productId, input.productId), eq(stockLevels.storeId, input.storeId)))
+      .where(and(eq(stockLevels.productId, input.productId), eq(stockLevels.storeId, input.storeId), eq(stockLevels.tenantId, tenantId)))
 
     if (variance !== 0) {
       await tx.insert(stockMovements).values({
@@ -33,6 +34,7 @@ export async function recordStockCount(input: { storeId: number; productId: numb
         storeId: input.storeId,
         quantity: variance,
         note: 'Comptage physique',
+        tenantId,
       })
     }
 

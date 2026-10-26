@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
   const period = parsePeriodLabel(searchParams.get('period'), '7d')
   const store = effectiveStoreParam(ctx, searchParams.get('store'))
 
-  const [data, storeOptions] = await Promise.all([getTransfersList(period, store), getStoreOptions()])
+  const [data, storeOptions] = await Promise.all([getTransfersList(ctx.tenantId, period, store), getStoreOptions(ctx.tenantId)])
 
   if (searchParams.get('format') === 'csv') {
     return csvResponse(
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const transfer = await createTransfer({ fromStoreId, toStoreId, items: parsedItems })
+    const transfer = await createTransfer(ctx.tenantId, { fromStoreId, toStoreId, items: parsedItems })
     return NextResponse.json({ transfer }, { status: 201 })
   } catch (error) {
     return NextResponse.json({ error: toApiErrorMessage(error) }, { status: 400 })

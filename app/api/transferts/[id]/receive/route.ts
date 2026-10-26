@@ -1,6 +1,6 @@
-import { eq } from 'drizzle-orm'
+import { eq, and } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
-import { db } from '@/lib/db/client'
+import { withTenant } from '@/lib/db/tenant'
 import { transfers } from '@/lib/db/schema'
 import { receiveTransfer } from '@/lib/db/mutations'
 import { toApiErrorMessage } from '@/lib/api-error'
@@ -17,7 +17,9 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ error: 'Identifiant de transfert invalide.' }, { status: 400 })
   }
 
-  const [transfer] = await db.select().from(transfers).where(eq(transfers.id, transferId))
+  const [transfer] = await withTenant(ctx.tenantId, async (tx) =>
+    tx.select().from(transfers).where(and(eq(transfers.id, transferId), eq(transfers.tenantId, ctx.tenantId))),
+  )
   if (!transfer) {
     return NextResponse.json({ error: 'Transfert introuvable.' }, { status: 404 })
   }
@@ -27,7 +29,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   }
 
   try {
-    await receiveTransfer(transferId)
+    await receiveTransfer(ctx.tenantId, transferId)
     return NextResponse.json({ ok: true })
   } catch (error) {
     return NextResponse.json({ error: toApiErrorMessage(error) }, { status: 400 })

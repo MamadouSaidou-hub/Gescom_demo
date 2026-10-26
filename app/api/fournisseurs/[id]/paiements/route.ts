@@ -19,7 +19,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   try {
-    await recordSupplierPayment({ supplierId, amount, method })
+    await recordSupplierPayment(ctx.tenantId, { supplierId, amount, method })
     return NextResponse.json({ ok: true }, { status: 201 })
   } catch (error) {
     return NextResponse.json({ error: toApiErrorMessage(error) }, { status: 400 })

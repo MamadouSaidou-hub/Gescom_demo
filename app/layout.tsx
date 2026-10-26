@@ -1,11 +1,32 @@
 import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
+import { headers } from 'next/headers'
+import { redirect } from 'next/navigation'
 import './globals.css'
-import { companyInfo } from '@/lib/company-info'
-import { businessConfig } from '@/lib/business-config'
-import { ensureSettingsLoaded } from '@/lib/settings-cache'
+import { getDefaultBranding, getTenantBranding } from '@/lib/settings-cache'
+import { getSessionState } from '@/lib/session'
 import { SettingsProvider } from '@/components/settings-provider'
+
+// Resolves branding fresh for *this* request — never a shared mutable global — so concurrent
+// requests from different tenants on the same server instance can never see each other's
+// company name/logo/currency. Falls back to the static demo defaults when there's no session
+// yet (e.g. the login page).
+async function resolveRequestBranding() {
+  const state = await getSessionState()
+  return state.kind === 'active' ? getTenantBranding(state.ctx.tenantId) : getDefaultBranding()
+}
+
+// A suspended workspace still has a valid session cookie, so without this the client lands on the
+// normal shell where every request fails — an explanation beats a wall of errors. The API routes
+// enforce the suspension independently (getSessionContext returns null), so this is purely UX.
+async function redirectIfSuspended() {
+  const state = await getSessionState()
+  if (state.kind !== 'suspended') return
+  const pathname = (await headers()).get('x-pathname') ?? ''
+  if (pathname.startsWith('/suspendu')) return
+  redirect('/suspendu')
+}
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' })
 
@@ -18,16 +39,16 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'sw
 export const dynamic = 'force-dynamic'
 
 export async function generateMetadata(): Promise<Metadata> {
-  await ensureSettingsLoaded()
+  const branding = await resolveRequestBranding()
   return {
-    title: `${companyInfo.shortName} · Tableau de bord`,
+    title: `${branding.companyShortName} · Tableau de bord`,
     description: 'Pilotez vos magasins, vos ventes et votre trésorerie depuis un seul espace.',
-    generator: `${companyInfo.shortName} ${companyInfo.displayName}`,
+    generator: `${branding.companyShortName} ${branding.companyName}`,
     manifest: '/manifest.webmanifest',
     appleWebApp: {
       capable: true,
       statusBarStyle: 'default',
-      title: companyInfo.shortName,
+      title: branding.companyShortName,
     },
     formatDetection: { telephone: false },
   }
@@ -56,19 +77,24 @@ try {
 `
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  await ensureSettingsLoaded()
+  await redirectIfSuspended()
+  const branding = await resolveRequestBranding()
   const settings = {
-    companyName: companyInfo.displayName,
-    companyShortName: companyInfo.shortName,
-    country: companyInfo.country,
-    currency: businessConfig.currency,
-    address: companyInfo.address,
-    phone: companyInfo.phone,
-    email: companyInfo.email,
+    companyName: branding.companyName,
+    companyShortName: branding.companyShortName,
+    country: branding.country,
+    currency: branding.currency,
+    address: branding.companyAddress,
+    phone: branding.companyPhone,
+    email: branding.companyEmail,
   }
 
   return (
-    <html lang="fr" className={`bg-background ${inter.variable}`}>
+    // suppressHydrationWarning: themeScript below runs before React and sets `data-theme` and
+    // `color-scheme` on this element from localStorage, which the server cannot know — so the
+    // markup legitimately differs on arrival. Scoped to this element's own attributes only, one
+    // level deep: a real mismatch anywhere else in the tree is still reported.
+    <html lang="fr" className={`bg-background ${inter.variable}`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>

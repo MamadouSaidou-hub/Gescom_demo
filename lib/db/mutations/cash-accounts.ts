@@ -1,5 +1,5 @@
-import { eq, ne, sql } from 'drizzle-orm'
-import { db } from '../client'
+import { and, eq, ne, sql } from 'drizzle-orm'
+import { withTenant, type TenantTx } from '../tenant'
 import { cashAccounts, cashAccountType, cashMovements, cashMovementType } from '../schema'
 
 /**
@@ -12,40 +12,52 @@ import { cashAccounts, cashAccountType, cashMovements, cashMovementType } from '
  * still tracked somewhere; if there's no caisse at all, the movement is simply skipped — this never
  * blocks the sale/payment itself from succeeding.
  */
-export async function recordAutoCashMovement(input: {
-  direction: 'in' | 'out'
-  amount: number
-  storeId?: number | null
-  category: string
-  description?: string | null
-}) {
+export async function recordAutoCashMovement(
+  tenantId: number,
+  input: {
+    direction: 'in' | 'out'
+    amount: number
+    storeId?: number | null
+    category: string
+    description?: string | null
+  },
+) {
   if (input.amount <= 0) return null
 
-  const accounts = await db.select().from(cashAccounts).orderBy(cashAccounts.id)
-  const account = accounts.find((row) => row.isDefault) ?? accounts[0]
-  if (!account) return null
+  return withTenant(tenantId, async (tx) => {
+    const accounts = await tx.select().from(cashAccounts).where(eq(cashAccounts.tenantId, tenantId)).orderBy(cashAccounts.id)
+    const account = accounts.find((row) => row.isDefault) ?? accounts[0]
+    if (!account) return null
 
-  return recordCashMovement({
-    cashAccountId: account.id,
-    type: input.direction === 'in' ? 'deposit' : 'expense',
-    category: input.category,
-    description: input.description,
-    amount: input.amount,
-    storeId: input.storeId ?? null,
+    return recordCashMovementTx(tx, tenantId, {
+      cashAccountId: account.id,
+      type: input.direction === 'in' ? 'deposit' : 'expense',
+      category: input.category,
+      description: input.description,
+      amount: input.amount,
+      storeId: input.storeId ?? null,
+    })
   })
 }
 
-export async function setDefaultCashAccount(id: number) {
-  return db.transaction(async (tx) => {
-    const [account] = await tx.select().from(cashAccounts).where(eq(cashAccounts.id, id))
+export async function setDefaultCashAccount(tenantId: number, id: number) {
+  return withTenant(tenantId, async (tx) => {
+    const [account] = await tx.select().from(cashAccounts).where(and(eq(cashAccounts.id, id), eq(cashAccounts.tenantId, tenantId)))
     if (!account) throw new Error('Caisse introuvable.')
-    await tx.update(cashAccounts).set({ isDefault: false }).where(ne(cashAccounts.id, id))
-    const [updated] = await tx.update(cashAccounts).set({ isDefault: true }).where(eq(cashAccounts.id, id)).returning()
+    await tx.update(cashAccounts).set({ isDefault: false }).where(and(ne(cashAccounts.id, id), eq(cashAccounts.tenantId, tenantId)))
+    const [updated] = await tx
+      .update(cashAccounts)
+      .set({ isDefault: true })
+      .where(and(eq(cashAccounts.id, id), eq(cashAccounts.tenantId, tenantId)))
+      .returning()
     return updated
   })
 }
 
-export async function transferBetweenCashAccounts(input: { fromId: number; toId: number; amount: number; description?: string | null }) {
+export async function transferBetweenCashAccounts(
+  tenantId: number,
+  input: { fromId: number; toId: number; amount: number; description?: string | null },
+) {
   if (input.fromId === input.toId) {
     throw new Error('Choisissez deux caisses différentes.')
   }
@@ -53,80 +65,123 @@ export async function transferBetweenCashAccounts(input: { fromId: number; toId:
     throw new Error('Le montant doit être supérieur à zéro.')
   }
 
-  return db.transaction(async (tx) => {
-    const [fromAccount] = await tx.select().from(cashAccounts).where(eq(cashAccounts.id, input.fromId))
-    const [toAccount] = await tx.select().from(cashAccounts).where(eq(cashAccounts.id, input.toId))
+  return withTenant(tenantId, async (tx) => {
+    const [fromAccount] = await tx.select().from(cashAccounts).where(and(eq(cashAccounts.id, input.fromId), eq(cashAccounts.tenantId, tenantId)))
+    const [toAccount] = await tx.select().from(cashAccounts).where(and(eq(cashAccounts.id, input.toId), eq(cashAccounts.tenantId, tenantId)))
     if (!fromAccount || !toAccount) {
       throw new Error('Caisse introuvable.')
     }
 
     await tx.insert(cashMovements).values([
-      { cashAccountId: input.fromId, type: 'expense', category: 'Transfert interne', description: input.description ?? `Vers ${toAccount.name}`, amount: input.amount },
-      { cashAccountId: input.toId, type: 'deposit', category: 'Transfert interne', description: input.description ?? `Depuis ${fromAccount.name}`, amount: input.amount },
+      {
+        cashAccountId: input.fromId,
+        type: 'expense',
+        category: 'Transfert interne',
+        description: input.description ?? `Vers ${toAccount.name}`,
+        amount: input.amount,
+        tenantId,
+      },
+      {
+        cashAccountId: input.toId,
+        type: 'deposit',
+        category: 'Transfert interne',
+        description: input.description ?? `Depuis ${fromAccount.name}`,
+        amount: input.amount,
+        tenantId,
+      },
     ])
 
-    await tx.update(cashAccounts).set({ balance: sql`${cashAccounts.balance} - ${input.amount}` }).where(eq(cashAccounts.id, input.fromId))
-    await tx.update(cashAccounts).set({ balance: sql`${cashAccounts.balance} + ${input.amount}` }).where(eq(cashAccounts.id, input.toId))
+    await tx
+      .update(cashAccounts)
+      .set({ balance: sql`${cashAccounts.balance} - ${input.amount}` })
+      .where(and(eq(cashAccounts.id, input.fromId), eq(cashAccounts.tenantId, tenantId)))
+    await tx
+      .update(cashAccounts)
+      .set({ balance: sql`${cashAccounts.balance} + ${input.amount}` })
+      .where(and(eq(cashAccounts.id, input.toId), eq(cashAccounts.tenantId, tenantId)))
 
     return { fromId: input.fromId, toId: input.toId, amount: input.amount }
   })
 }
 
-export async function createCashAccount(input: {
-  name: string
-  type: (typeof cashAccountType)[number]
-  storeId?: number | null
-  initialBalance: number
-}) {
-  const [account] = await db
-    .insert(cashAccounts)
-    .values({
-      name: input.name,
-      type: input.type,
-      balance: input.initialBalance,
-      storeId: input.storeId ?? null,
-    })
-    .returning()
+export async function createCashAccount(
+  tenantId: number,
+  input: {
+    name: string
+    type: (typeof cashAccountType)[number]
+    storeId?: number | null
+    initialBalance: number
+  },
+) {
+  return withTenant(tenantId, async (tx) => {
+    const [account] = await tx
+      .insert(cashAccounts)
+      .values({
+        name: input.name,
+        type: input.type,
+        balance: input.initialBalance,
+        storeId: input.storeId ?? null,
+        tenantId,
+      })
+      .returning()
 
-  return account
+    return account
+  })
 }
 
-export async function recordCashMovement(input: {
-  cashAccountId: number
-  type: (typeof cashMovementType)[number]
-  category: string
-  description?: string | null
-  amount: number
-  storeId?: number | null
-}) {
+export async function recordCashMovement(
+  tenantId: number,
+  input: {
+    cashAccountId: number
+    type: (typeof cashMovementType)[number]
+    category: string
+    description?: string | null
+    amount: number
+    storeId?: number | null
+  },
+) {
   if (input.amount <= 0) {
     throw new Error('Le montant doit être supérieur à zéro.')
   }
 
-  return db.transaction(async (tx) => {
-    const [account] = await tx.select().from(cashAccounts).where(eq(cashAccounts.id, input.cashAccountId))
-    if (!account) {
-      throw new Error('Caisse introuvable.')
-    }
+  return withTenant(tenantId, async (tx) => recordCashMovementTx(tx, tenantId, input))
+}
 
-    const [movement] = await tx
-      .insert(cashMovements)
-      .values({
-        cashAccountId: input.cashAccountId,
-        storeId: input.storeId ?? null,
-        type: input.type,
-        category: input.category,
-        description: input.description ?? null,
-        amount: input.amount,
-      })
-      .returning()
+async function recordCashMovementTx(
+  tx: TenantTx,
+  tenantId: number,
+  input: {
+    cashAccountId: number
+    type: (typeof cashMovementType)[number]
+    category: string
+    description?: string | null
+    amount: number
+    storeId?: number | null
+  },
+) {
+  const [account] = await tx.select().from(cashAccounts).where(and(eq(cashAccounts.id, input.cashAccountId), eq(cashAccounts.tenantId, tenantId)))
+  if (!account) {
+    throw new Error('Caisse introuvable.')
+  }
 
-    const delta = input.type === 'deposit' ? input.amount : -input.amount
-    await tx
-      .update(cashAccounts)
-      .set({ balance: sql`${cashAccounts.balance} + ${delta}` })
-      .where(eq(cashAccounts.id, input.cashAccountId))
+  const [movement] = await tx
+    .insert(cashMovements)
+    .values({
+      cashAccountId: input.cashAccountId,
+      storeId: input.storeId ?? null,
+      type: input.type,
+      category: input.category,
+      description: input.description ?? null,
+      amount: input.amount,
+      tenantId,
+    })
+    .returning()
 
-    return movement
-  })
+  const delta = input.type === 'deposit' ? input.amount : -input.amount
+  await tx
+    .update(cashAccounts)
+    .set({ balance: sql`${cashAccounts.balance} + ${delta}` })
+    .where(and(eq(cashAccounts.id, input.cashAccountId), eq(cashAccounts.tenantId, tenantId)))
+
+  return movement
 }

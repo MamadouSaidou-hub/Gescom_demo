@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const result = await transferBetweenCashAccounts({ fromId, toId, amount, description })
+    const result = await transferBetweenCashAccounts(ctx.tenantId, { fromId, toId, amount, description })
     return NextResponse.json({ ok: true, ...result }, { status: 201 })
   } catch (error) {
     return NextResponse.json({ error: toApiErrorMessage(error) }, { status: 400 })

@@ -19,7 +19,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ par
   const type = parseParty(partyType, partyId)
   if (!type) return NextResponse.json({ error: 'Paramètres invalides.' }, { status: 400 })
 
-  const [scale, history] = await Promise.all([getDiscountScale(type, Number(partyId)), getDiscountHistory(type, Number(partyId))])
+  const [scale, history] = await Promise.all([getDiscountScale(ctx.tenantId, type, Number(partyId)), getDiscountHistory(ctx.tenantId, type, Number(partyId))])
   return NextResponse.json({ ...scale, history })
 }
 
@@ -44,7 +44,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   }
 
   try {
-    await setDiscountTiers(type, Number(partyId), parsedTiers)
+    await setDiscountTiers(ctx.tenantId, type, Number(partyId), parsedTiers)
     return NextResponse.json({ ok: true })
   } catch (error) {
     return NextResponse.json({ error: toApiErrorMessage(error) }, { status: 400 })

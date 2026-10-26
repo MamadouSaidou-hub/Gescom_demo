@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
   if (!isAdmin(ctx)) return NextResponse.json({ error: 'Réservé aux administrateurs.' }, { status: 403 })
 
   const period = parsePeriodLabel(request.nextUrl.searchParams.get('period'), '7d')
-  const data = await getCashAccountsOverview(period)
+  const data = await getCashAccountsOverview(ctx.tenantId, period)
 
   if (request.nextUrl.searchParams.get('format') === 'csv') {
     return csvResponse(
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const account = await createCashAccount({ name, type, initialBalance, storeId })
+    const account = await createCashAccount(ctx.tenantId, { name, type, initialBalance, storeId })
     return NextResponse.json({ account }, { status: 201 })
   } catch (error) {
     return NextResponse.json({ error: toApiErrorMessage(error) }, { status: 400 })

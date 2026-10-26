@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
   if (!ctx) return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 })
 
   const store = effectiveStoreParam(ctx, request.nextUrl.searchParams.get('store'))
-  const [data, storeOptions] = await Promise.all([getStockOverview(store), getStoreOptions()])
+  const [data, storeOptions] = await Promise.all([getStockOverview(ctx.tenantId, store), getStoreOptions(ctx.tenantId)])
 
   if (request.nextUrl.searchParams.get('format') === 'csv') {
     return csvResponse(
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    await addStockReception({ productId, storeId, quantity, reference: body.reference ? String(body.reference) : undefined })
+    await addStockReception(ctx.tenantId, { productId, storeId, quantity, reference: body.reference ? String(body.reference) : undefined })
     return NextResponse.json({ ok: true }, { status: 201 })
   } catch (error) {
     return NextResponse.json({ error: toApiErrorMessage(error) }, { status: 400 })

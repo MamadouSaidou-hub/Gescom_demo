@@ -1,8 +1,8 @@
 import { notFound } from 'next/navigation'
 import { getSaleDetail } from '@/lib/db/queries'
 import { getSessionContext, isAdmin } from '@/lib/session'
+import { getTenantBranding } from '@/lib/settings-cache'
 import { companyInfo } from '@/lib/company-info'
-import { businessConfig } from '@/lib/business-config'
 import { amountInWords } from '@/lib/number-to-words'
 import { InvoiceActions } from './invoice-actions'
 
@@ -18,7 +18,8 @@ export default async function Page({ params }: { params: Promise<{ reference: st
   const ctx = await getSessionContext()
   if (!ctx) notFound()
 
-  const sale = await getSaleDetail(reference)
+  const branding = await getTenantBranding(ctx.tenantId)
+  const sale = await getSaleDetail(ctx.tenantId, reference)
   if (!sale) notFound()
   if (!isAdmin(ctx) && sale.storeId !== ctx.storeId) notFound()
 
@@ -33,13 +34,13 @@ export default async function Page({ params }: { params: Promise<{ reference: st
           <div className="invoice-header">
             <div className="invoice-brand">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/api/logo" alt={companyInfo.name} style={{ width: 64, height: 64, objectFit: 'contain', flexShrink: 0 }} />
+              <img src="/api/logo" alt={branding.companyName} style={{ width: 64, height: 64, objectFit: 'contain', flexShrink: 0 }} />
               <div>
-                <div style={{ fontSize: 17, fontWeight: 800, color: NAVY, letterSpacing: '-.3px' }}>{companyInfo.name}</div>
+                <div style={{ fontSize: 17, fontWeight: 800, color: NAVY, letterSpacing: '-.3px' }}>{branding.companyName}</div>
                 <div style={{ fontSize: 10, color: '#2e9e3f', fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', margin: '2px 0 6px' }}>{companyInfo.tagline}</div>
                 <div style={{ fontSize: 10.5, color: MUTED, lineHeight: 1.6 }}>
-                  <div>{companyInfo.address}</div>
-                  <div>{companyInfo.phone} · {companyInfo.email}</div>
+                  <div>{branding.companyAddress}</div>
+                  <div>{branding.companyPhone} · {branding.companyEmail}</div>
                 </div>
               </div>
             </div>
@@ -108,13 +109,13 @@ export default async function Page({ params }: { params: Promise<{ reference: st
           </div>
 
           <p style={{ fontSize: 10.5, color: MUTED, fontStyle: 'italic', margin: '10px 0 0' }}>
-            Arrêtée la présente facture à la somme de : <strong style={{ color: NAVY, fontStyle: 'normal' }}>{amountInWords(sale.totalAmount)} {businessConfig.currency}</strong>
+            Arrêtée la présente facture à la somme de : <strong style={{ color: NAVY, fontStyle: 'normal' }}>{amountInWords(sale.totalAmount)} {branding.currency}</strong>
           </p>
         </div>
 
         <div className="invoice-footer" style={{ borderTop: `1px solid ${BORDER}` }}>
-          <p style={{ fontSize: 11, color: MUTED, margin: 0 }}>Merci pour votre confiance — {companyInfo.name}</p>
-          <p style={{ fontSize: 9.5, color: '#b3bdcb', margin: '4px 0 0' }}>{companyInfo.address} · {companyInfo.phone} · {companyInfo.email}</p>
+          <p style={{ fontSize: 11, color: MUTED, margin: 0 }}>Merci pour votre confiance — {branding.companyName}</p>
+          <p style={{ fontSize: 9.5, color: '#b3bdcb', margin: '4px 0 0' }}>{branding.companyAddress} · {branding.companyPhone} · {branding.companyEmail}</p>
         </div>
       </div>
 

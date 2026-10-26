@@ -29,7 +29,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   try {
-    const delivery = await recordSupplierDelivery({
+    const delivery = await recordSupplierDelivery(ctx.tenantId, {
       supplierId,
       storeId,
       productId,

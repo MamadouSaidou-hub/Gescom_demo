@@ -8,7 +8,7 @@ export async function GET() {
   const ctx = await getSessionContext()
   if (!ctx) return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 })
 
-  const data = await getStoresOverview()
+  const data = await getStoresOverview(ctx.tenantId)
   const scoped = isAdmin(ctx) ? data : data.filter((store) => store.id === ctx.storeId)
   return NextResponse.json({ stores: scoped })
 }
@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const store = await createStore({ name, city })
+    const store = await createStore(ctx.tenantId, { name, city })
     return NextResponse.json({ store }, { status: 201 })
   } catch (error) {
     return NextResponse.json({ error: toApiErrorMessage(error) }, { status: 400 })

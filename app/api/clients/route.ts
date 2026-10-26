@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
   const ctx = await getSessionContext()
   if (!ctx) return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 })
 
-  const data = await getClientsOverview(isAdmin(ctx) ? null : ctx.storeId)
+  const data = await getClientsOverview(ctx.tenantId, isAdmin(ctx) ? null : ctx.storeId)
 
   if (request.nextUrl.searchParams.get('format') === 'csv') {
     return csvResponse(
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
   const storeId = isAdmin(ctx) ? requestedStoreId : (requestedStoreId ?? ctx.storeId)
 
   try {
-    const client = await createClient({
+    const client = await createClient(ctx.tenantId, {
       name,
       phone: body.phone ? String(body.phone).trim() : undefined,
       storeId,

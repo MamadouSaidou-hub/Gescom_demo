@@ -6,9 +6,11 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   ArrowLeftRight,
   Banknote,
+  Building2,
   ChevronDown,
   CreditCard,
   Download,
+  FileClock,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -251,6 +253,7 @@ export function AppShell({
   const [menuOpen, setMenuOpen] = useState(false)
   const { data: session } = authClient.useSession()
   const isAdmin = session?.user?.role === 'admin'
+  const isPlatformAdmin = (session?.user as { platformAdmin?: boolean } | undefined)?.platformAdmin === true
   const { companyName, companyShortName } = useSettings()
 
   return (
@@ -276,6 +279,17 @@ export function AppShell({
               <item.icon />{item.label}
             </Link>
           ))}
+          {isPlatformAdmin && (
+            <>
+              <p className="nav-caption nav-caption-spaced">PLATEFORME</p>
+              <Link className={`nav-link ${pathname === '/platform/tenants' ? 'active' : ''}`} href="/platform/tenants">
+                <Building2 />Clients
+              </Link>
+              <Link className={`nav-link ${pathname === '/platform/audit' ? 'active' : ''}`} href="/platform/audit">
+                <FileClock />Journal d’audit
+              </Link>
+            </>
+          )}
         </nav>
         <div className="sidebar-footer">
           <UserChip />

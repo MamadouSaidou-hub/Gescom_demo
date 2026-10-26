@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
   const period = parsePeriodLabel(searchParams.get('period'), '7d')
   const store = effectiveStoreParam(ctx, searchParams.get('store'))
 
-  const [data, storeOptions] = await Promise.all([getSalesList(period, store), getStoreOptions()])
+  const [data, storeOptions] = await Promise.all([getSalesList(ctx.tenantId, period, store), getStoreOptions(ctx.tenantId)])
 
   if (searchParams.get('format') === 'csv') {
     return csvResponse(
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const sale = await createSale({
+    const sale = await createSale(ctx.tenantId, {
       storeId,
       clientId: body.clientId ? Number(body.clientId) : null,
       paymentStatus,

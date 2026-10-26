@@ -3,15 +3,21 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { nextCookies } from 'better-auth/next-js'
 import { admin } from 'better-auth/plugins'
 import { db } from './db/client'
-import { account, session, user, verification } from './db/auth-schema'
+import { account, rateLimit, session, user, verification } from './db/auth-schema'
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
     provider: 'pg',
-    schema: { user, session, account, verification },
+    schema: { user, session, account, verification, rateLimit },
   }),
   emailAndPassword: {
     enabled: true,
+  },
+  // Default storage is an in-memory Map, which resets on every cold start and isn't shared across
+  // serverless instances — on a multi-instance prod deploy that makes the brute-force protection on
+  // /sign-in (3 attempts/10s by default) effectively a no-op. Database storage makes it real.
+  rateLimit: {
+    storage: 'database',
   },
   user: {
     additionalFields: {
@@ -23,6 +29,16 @@ export const auth = betterAuth({
       storeId: {
         type: 'number',
         required: false,
+        input: false,
+      },
+      tenantId: {
+        type: 'number',
+        required: false,
+        input: false,
+      },
+      platformAdmin: {
+        type: 'boolean',
+        defaultValue: false,
         input: false,
       },
     },

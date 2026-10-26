@@ -1,5 +1,5 @@
 import { relations } from 'drizzle-orm'
-import { boolean, doublePrecision, index, integer, pgTable, serial, text, uniqueIndex } from 'drizzle-orm/pg-core'
+import { bigserial, boolean, doublePrecision, index, integer, jsonb, pgTable, serial, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core'
 
 const timestamps = {
   // JS-side default (not a DB-level `now()`/`current_timestamp`) so every timestamp in the app is
@@ -11,48 +11,114 @@ const timestamps = {
     .$defaultFn(() => new Date().toISOString()),
 }
 
-export const stores = pgTable('stores', {
+// One row per client business running on this platform. Every business table below carries a
+// `tenantId` FK into this table; Postgres RLS policies (see migration history / progress.md) key
+// off `current_setting('app.tenant_id')`, which lib/db/tenant.ts's `withTenant()` sets per
+// transaction. `slug` is reserved for future subdomain routing — unused for now (session-based
+// tenant resolution only, see progress.md).
+export const tenants = pgTable('tenants', {
   id: serial('id').primaryKey(),
   name: text('name').notNull(),
-  city: text('city').notNull(),
-  ...timestamps,
-})
-
-// Single-row table (id is always 1) holding the demo's runtime-editable branding —
-// company name, country, currency — so a sales demo can be re-themed per prospect from a
-// Settings page instead of editing code and redeploying.
-export const appSettings = pgTable('app_settings', {
-  id: integer('id').primaryKey().default(1),
-  companyName: text('company_name').notNull(),
-  companyShortName: text('company_short_name').notNull(),
+  slug: text('slug').unique(),
   country: text('country').notNull(),
   currency: text('currency').notNull(),
-  // Address/phone/email shown on invoices. Logo stored as a data: URL (base64) — simplest option
-  // that needs no object storage bucket/credentials; fine at logo scale, not meant for large files.
-  companyAddress: text('company_address'),
-  companyPhone: text('company_phone'),
-  companyEmail: text('company_email'),
-  logoDataUrl: text('logo_data_url'),
+  status: text('status').notNull().default('active'),
+  createdAt: text('created_at').notNull(),
 })
 
-export const products = pgTable('products', {
-  id: serial('id').primaryKey(),
-  name: text('name').notNull(),
-  sku: text('sku').notNull().unique(),
-  category: text('category').notNull(),
-  unitPrice: doublePrecision('unit_price').notNull(),
-  costPrice: doublePrecision('cost_price').notNull(),
-  reorderThreshold: integer('reorder_threshold').notNull().default(10),
-  // Weight of one sack, in kg — lets a sale be entered in tonnes and converted to a sack count.
-  // Null means this product can only be sold by sack count directly.
-  sackWeightKg: doublePrecision('sack_weight_kg'),
-  ...timestamps,
-})
+// Tamper-evident trail of sensitive actions (rights changes, account deletion, tenant
+// provisioning, suspension). Append-only is enforced by Postgres privileges — `app_runtime` holds
+// only INSERT+SELECT, so even a fully compromised app cannot rewrite history. `prevHash`/`entryHash`
+// are computed by the `audit_log_chain` BEFORE INSERT trigger (never by this app), so a row that
+// was removed or altered out-of-band breaks chain verification. Never put secrets/tokens in
+// `payload`. See lib/audit.ts and lib/db/migrations/0001_audit_log.sql.
+export const auditLog = pgTable(
+  'audit_log',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    actorId: text('actor_id').notNull(),
+    actorEmail: text('actor_email').notNull(),
+    // Null for platform-level events (tenant creation) that belong to no single tenant.
+    tenantId: integer('tenant_id').references(() => tenants.id),
+    action: text('action').notNull(),
+    targetType: text('target_type').notNull(),
+    targetId: text('target_id').notNull(),
+    payload: jsonb('payload').notNull().default({}),
+    // Defaults exist only so inserts typecheck without them — the BEFORE INSERT trigger overwrites
+    // whatever is passed here, so a caller can neither supply nor forge these values.
+    prevHash: text('prev_hash').notNull().default(''),
+    entryHash: text('entry_hash').notNull().default(''),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index('audit_log_tenant_id_idx').on(table.tenantId), index('audit_log_created_at_idx').on(table.createdAt)],
+)
+
+export const stores = pgTable(
+  'stores',
+  {
+    id: serial('id').primaryKey(),
+    tenantId: integer('tenant_id')
+      .notNull()
+      .references(() => tenants.id),
+    name: text('name').notNull(),
+    city: text('city').notNull(),
+    ...timestamps,
+  },
+  (table) => [index('stores_tenant_id_idx').on(table.tenantId)],
+)
+
+// One row per tenant holding that tenant's runtime-editable branding — company name, country,
+// currency — so each client can be re-themed from a Settings page instead of editing code and
+// redeploying. `id` is just a surrogate key now; `tenantId` is the real identity (unique).
+export const appSettings = pgTable(
+  'app_settings',
+  {
+    id: serial('id').primaryKey(),
+    tenantId: integer('tenant_id')
+      .notNull()
+      .references(() => tenants.id),
+    companyName: text('company_name').notNull(),
+    companyShortName: text('company_short_name').notNull(),
+    country: text('country').notNull(),
+    currency: text('currency').notNull(),
+    // Address/phone/email shown on invoices. Logo stored as a data: URL (base64) — simplest option
+    // that needs no object storage bucket/credentials; fine at logo scale, not meant for large files.
+    companyAddress: text('company_address'),
+    companyPhone: text('company_phone'),
+    companyEmail: text('company_email'),
+    logoDataUrl: text('logo_data_url'),
+  },
+  (table) => [uniqueIndex('app_settings_tenant_id_unique').on(table.tenantId)],
+)
+
+export const products = pgTable(
+  'products',
+  {
+    id: serial('id').primaryKey(),
+    tenantId: integer('tenant_id')
+      .notNull()
+      .references(() => tenants.id),
+    name: text('name').notNull(),
+    sku: text('sku').notNull(),
+    category: text('category').notNull(),
+    unitPrice: doublePrecision('unit_price').notNull(),
+    costPrice: doublePrecision('cost_price').notNull(),
+    reorderThreshold: integer('reorder_threshold').notNull().default(10),
+    // Weight of one sack, in kg — lets a sale be entered in tonnes and converted to a sack count.
+    // Null means this product can only be sold by sack count directly.
+    sackWeightKg: doublePrecision('sack_weight_kg'),
+    ...timestamps,
+  },
+  (table) => [uniqueIndex('products_tenant_sku_unique').on(table.tenantId, table.sku), index('products_tenant_id_idx').on(table.tenantId)],
+)
 
 export const stockLevels = pgTable(
   'stock_levels',
   {
     id: serial('id').primaryKey(),
+    tenantId: integer('tenant_id')
+      .notNull()
+      .references(() => tenants.id),
     productId: integer('product_id')
       .notNull()
       .references(() => products.id, { onDelete: 'cascade' }),
@@ -61,7 +127,7 @@ export const stockLevels = pgTable(
       .references(() => stores.id, { onDelete: 'cascade' }),
     quantity: integer('quantity').notNull().default(0),
   },
-  (table) => [index('stock_levels_product_store_idx').on(table.productId, table.storeId)],
+  (table) => [index('stock_levels_product_store_idx').on(table.productId, table.storeId), index('stock_levels_tenant_id_idx').on(table.tenantId)],
 )
 
 export const stockMovementType = ['reception', 'transfer_out', 'transfer_in', 'adjustment', 'sale'] as const
@@ -70,6 +136,9 @@ export const stockMovements = pgTable(
   'stock_movements',
   {
     id: serial('id').primaryKey(),
+    tenantId: integer('tenant_id')
+      .notNull()
+      .references(() => tenants.id),
     type: text('type', { enum: stockMovementType }).notNull(),
     productId: integer('product_id')
       .notNull()
@@ -86,6 +155,7 @@ export const stockMovements = pgTable(
     index('stock_movements_store_id_idx').on(table.storeId),
     index('stock_movements_product_id_idx').on(table.productId),
     index('stock_movements_created_at_idx').on(table.createdAt),
+    index('stock_movements_tenant_id_idx').on(table.tenantId),
   ],
 )
 
@@ -93,6 +163,9 @@ export const stockCounts = pgTable(
   'stock_counts',
   {
     id: serial('id').primaryKey(),
+    tenantId: integer('tenant_id')
+      .notNull()
+      .references(() => tenants.id),
     storeId: integer('store_id')
       .notNull()
       .references(() => stores.id, { onDelete: 'cascade' }),
@@ -107,19 +180,26 @@ export const stockCounts = pgTable(
     countedBy: text('counted_by').notNull(),
     ...timestamps,
   },
-  (table) => [index('stock_counts_store_id_idx').on(table.storeId), index('stock_counts_product_id_idx').on(table.productId)],
+  (table) => [
+    index('stock_counts_store_id_idx').on(table.storeId),
+    index('stock_counts_product_id_idx').on(table.productId),
+    index('stock_counts_tenant_id_idx').on(table.tenantId),
+  ],
 )
 
 export const clients = pgTable(
   'clients',
   {
     id: serial('id').primaryKey(),
+    tenantId: integer('tenant_id')
+      .notNull()
+      .references(() => tenants.id),
     name: text('name').notNull(),
     phone: text('phone'),
     storeId: integer('store_id').references(() => stores.id, { onDelete: 'set null' }),
     ...timestamps,
   },
-  (table) => [index('clients_store_id_idx').on(table.storeId)],
+  (table) => [index('clients_store_id_idx').on(table.storeId), index('clients_tenant_id_idx').on(table.tenantId)],
 )
 
 export const salePaymentStatus = ['paid', 'partial', 'credit'] as const
@@ -128,6 +208,11 @@ export const sales = pgTable(
   'sales',
   {
     id: serial('id').primaryKey(),
+    tenantId: integer('tenant_id')
+      .notNull()
+      .references(() => tenants.id),
+    // Globally unique (not per-tenant) — generated from a single Postgres sequence
+    // (sales_reference_seq), so it's already collision-free even across tenants.
     reference: text('reference').notNull().unique(),
     storeId: integer('store_id')
       .notNull()
@@ -142,6 +227,7 @@ export const sales = pgTable(
     index('sales_store_id_idx').on(table.storeId),
     index('sales_client_id_idx').on(table.clientId),
     index('sales_created_at_idx').on(table.createdAt),
+    index('sales_tenant_id_idx').on(table.tenantId),
   ],
 )
 
@@ -151,6 +237,9 @@ export const saleItems = pgTable(
   'sale_items',
   {
     id: serial('id').primaryKey(),
+    tenantId: integer('tenant_id')
+      .notNull()
+      .references(() => tenants.id),
     saleId: integer('sale_id')
       .notNull()
       .references(() => sales.id, { onDelete: 'cascade' }),
@@ -164,7 +253,11 @@ export const saleItems = pgTable(
     unit: text('unit', { enum: saleItemUnit }).notNull().default('sack'),
     tonnage: doublePrecision('tonnage'),
   },
-  (table) => [index('sale_items_sale_id_idx').on(table.saleId), index('sale_items_product_id_idx').on(table.productId)],
+  (table) => [
+    index('sale_items_sale_id_idx').on(table.saleId),
+    index('sale_items_product_id_idx').on(table.productId),
+    index('sale_items_tenant_id_idx').on(table.tenantId),
+  ],
 )
 
 export const paymentMethod = ['cash', 'mobile_money', 'bank_transfer', 'check'] as const
@@ -173,6 +266,9 @@ export const payments = pgTable(
   'payments',
   {
     id: serial('id').primaryKey(),
+    tenantId: integer('tenant_id')
+      .notNull()
+      .references(() => tenants.id),
     clientId: integer('client_id')
       .notNull()
       .references(() => clients.id, { onDelete: 'cascade' }),
@@ -188,6 +284,7 @@ export const payments = pgTable(
     index('payments_client_id_idx').on(table.clientId),
     index('payments_store_id_idx').on(table.storeId),
     index('payments_created_at_idx').on(table.createdAt),
+    index('payments_tenant_id_idx').on(table.tenantId),
   ],
 )
 
@@ -197,6 +294,9 @@ export const receivables = pgTable(
   'receivables',
   {
     id: serial('id').primaryKey(),
+    tenantId: integer('tenant_id')
+      .notNull()
+      .references(() => tenants.id),
     clientId: integer('client_id')
       .notNull()
       .references(() => clients.id, { onDelete: 'cascade' }),
@@ -212,6 +312,7 @@ export const receivables = pgTable(
     index('receivables_client_id_idx').on(table.clientId),
     index('receivables_sale_id_idx').on(table.saleId),
     index('receivables_status_idx').on(table.status),
+    index('receivables_tenant_id_idx').on(table.tenantId),
   ],
 )
 
@@ -221,6 +322,9 @@ export const transfers = pgTable(
   'transfers',
   {
     id: serial('id').primaryKey(),
+    tenantId: integer('tenant_id')
+      .notNull()
+      .references(() => tenants.id),
     reference: text('reference').notNull().unique(),
     fromStoreId: integer('from_store_id')
       .notNull()
@@ -236,6 +340,7 @@ export const transfers = pgTable(
     index('transfers_to_store_id_idx').on(table.toStoreId),
     index('transfers_status_idx').on(table.status),
     index('transfers_created_at_idx').on(table.createdAt),
+    index('transfers_tenant_id_idx').on(table.tenantId),
   ],
 )
 
@@ -243,6 +348,9 @@ export const transferItems = pgTable(
   'transfer_items',
   {
     id: serial('id').primaryKey(),
+    tenantId: integer('tenant_id')
+      .notNull()
+      .references(() => tenants.id),
     transferId: integer('transfer_id')
       .notNull()
       .references(() => transfers.id, { onDelete: 'cascade' }),
@@ -251,20 +359,30 @@ export const transferItems = pgTable(
       .references(() => products.id, { onDelete: 'restrict' }),
     quantity: integer('quantity').notNull(),
   },
-  (table) => [index('transfer_items_transfer_id_idx').on(table.transferId)],
+  (table) => [index('transfer_items_transfer_id_idx').on(table.transferId), index('transfer_items_tenant_id_idx').on(table.tenantId)],
 )
 
-export const suppliers = pgTable('suppliers', {
-  id: serial('id').primaryKey(),
-  name: text('name').notNull(),
-  phone: text('phone'),
-  ...timestamps,
-})
+export const suppliers = pgTable(
+  'suppliers',
+  {
+    id: serial('id').primaryKey(),
+    tenantId: integer('tenant_id')
+      .notNull()
+      .references(() => tenants.id),
+    name: text('name').notNull(),
+    phone: text('phone'),
+    ...timestamps,
+  },
+  (table) => [index('suppliers_tenant_id_idx').on(table.tenantId)],
+)
 
 export const supplierDeliveries = pgTable(
   'supplier_deliveries',
   {
     id: serial('id').primaryKey(),
+    tenantId: integer('tenant_id')
+      .notNull()
+      .references(() => tenants.id),
     supplierId: integer('supplier_id')
       .notNull()
       .references(() => suppliers.id, { onDelete: 'cascade' }),
@@ -285,6 +403,7 @@ export const supplierDeliveries = pgTable(
     index('supplier_deliveries_store_id_idx').on(table.storeId),
     index('supplier_deliveries_product_id_idx').on(table.productId),
     index('supplier_deliveries_created_at_idx').on(table.createdAt),
+    index('supplier_deliveries_tenant_id_idx').on(table.tenantId),
   ],
 )
 
@@ -294,6 +413,9 @@ export const supplierPayables = pgTable(
   'supplier_payables',
   {
     id: serial('id').primaryKey(),
+    tenantId: integer('tenant_id')
+      .notNull()
+      .references(() => tenants.id),
     supplierId: integer('supplier_id')
       .notNull()
       .references(() => suppliers.id, { onDelete: 'cascade' }),
@@ -305,13 +427,20 @@ export const supplierPayables = pgTable(
     status: text('status', { enum: supplierPayableStatus }).notNull().default('pending'),
     ...timestamps,
   },
-  (table) => [index('supplier_payables_supplier_id_idx').on(table.supplierId), index('supplier_payables_status_idx').on(table.status)],
+  (table) => [
+    index('supplier_payables_supplier_id_idx').on(table.supplierId),
+    index('supplier_payables_status_idx').on(table.status),
+    index('supplier_payables_tenant_id_idx').on(table.tenantId),
+  ],
 )
 
 export const supplierPayments = pgTable(
   'supplier_payments',
   {
     id: serial('id').primaryKey(),
+    tenantId: integer('tenant_id')
+      .notNull()
+      .references(() => tenants.id),
     supplierId: integer('supplier_id')
       .notNull()
       .references(() => suppliers.id, { onDelete: 'cascade' }),
@@ -319,7 +448,11 @@ export const supplierPayments = pgTable(
     method: text('method', { enum: paymentMethod }).notNull().default('cash'),
     ...timestamps,
   },
-  (table) => [index('supplier_payments_supplier_id_idx').on(table.supplierId), index('supplier_payments_created_at_idx').on(table.createdAt)],
+  (table) => [
+    index('supplier_payments_supplier_id_idx').on(table.supplierId),
+    index('supplier_payments_created_at_idx').on(table.createdAt),
+    index('supplier_payments_tenant_id_idx').on(table.tenantId),
+  ],
 )
 
 export const cashAccountType = ['cash', 'bank', 'mobile_money', 'other'] as const
@@ -328,6 +461,9 @@ export const cashAccounts = pgTable(
   'cash_accounts',
   {
     id: serial('id').primaryKey(),
+    tenantId: integer('tenant_id')
+      .notNull()
+      .references(() => tenants.id),
     name: text('name').notNull(),
     type: text('type', { enum: cashAccountType }).notNull().default('cash'),
     balance: doublePrecision('balance').notNull().default(0),
@@ -340,7 +476,7 @@ export const cashAccounts = pgTable(
     isDefault: boolean('is_default').notNull().default(false),
     ...timestamps,
   },
-  (table) => [index('cash_accounts_store_id_idx').on(table.storeId)],
+  (table) => [index('cash_accounts_store_id_idx').on(table.storeId), index('cash_accounts_tenant_id_idx').on(table.tenantId)],
 )
 
 export const cashMovementType = ['expense', 'deposit'] as const
@@ -349,6 +485,9 @@ export const cashMovements = pgTable(
   'cash_movements',
   {
     id: serial('id').primaryKey(),
+    tenantId: integer('tenant_id')
+      .notNull()
+      .references(() => tenants.id),
     // restrict, pas cascade : on ne veut jamais perdre l'historique financier en supprimant une caisse.
     cashAccountId: integer('cash_account_id')
       .notNull()
@@ -363,7 +502,11 @@ export const cashMovements = pgTable(
     amount: doublePrecision('amount').notNull(),
     ...timestamps,
   },
-  (table) => [index('cash_movements_account_id_idx').on(table.cashAccountId), index('cash_movements_created_at_idx').on(table.createdAt)],
+  (table) => [
+    index('cash_movements_account_id_idx').on(table.cashAccountId),
+    index('cash_movements_created_at_idx').on(table.createdAt),
+    index('cash_movements_tenant_id_idx').on(table.tenantId),
+  ],
 )
 
 export const discountPartyType = ['supplier', 'client'] as const
@@ -372,6 +515,9 @@ export const discountScales = pgTable(
   'discount_scales',
   {
     id: serial('id').primaryKey(),
+    tenantId: integer('tenant_id')
+      .notNull()
+      .references(() => tenants.id),
     partyType: text('party_type', { enum: discountPartyType }).notNull(),
     // Not FK-constrained — polymorphic across `clients`/`suppliers`, validated at the application layer,
     // matching the pattern already used by `stockCounts.countedBy`.
@@ -386,27 +532,38 @@ export const discountScales = pgTable(
   // getOrCreateScale() in lib/db/mutations/discounts.ts. Unique (not just indexed): two concurrent
   // calls both finding "no scale yet" and both inserting would otherwise create two rows for the same
   // party, fragmenting tier config and cycle tracking. The unique constraint plus an
-  // onConflictDoNothing + re-select in getOrCreateScale makes that race safe.
-  (table) => [uniqueIndex('discount_scales_party_idx').on(table.partyType, table.partyId)],
+  // onConflictDoNothing + re-select in getOrCreateScale makes that race safe. Not widened to include
+  // tenantId: partyId is already globally unique (serial PK on clients/suppliers), so this stays safe
+  // even across tenants.
+  (table) => [
+    uniqueIndex('discount_scales_party_idx').on(table.partyType, table.partyId),
+    index('discount_scales_tenant_id_idx').on(table.tenantId),
+  ],
 )
 
 export const discountTiers = pgTable(
   'discount_tiers',
   {
     id: serial('id').primaryKey(),
+    tenantId: integer('tenant_id')
+      .notNull()
+      .references(() => tenants.id),
     scaleId: integer('scale_id')
       .notNull()
       .references(() => discountScales.id, { onDelete: 'cascade' }),
     thresholdSacks: integer('threshold_sacks').notNull(),
     discountPerSack: doublePrecision('discount_per_sack').notNull(),
   },
-  (table) => [index('discount_tiers_scale_id_idx').on(table.scaleId)],
+  (table) => [index('discount_tiers_scale_id_idx').on(table.scaleId), index('discount_tiers_tenant_id_idx').on(table.tenantId)],
 )
 
 export const discountApplications = pgTable(
   'discount_applications',
   {
     id: serial('id').primaryKey(),
+    tenantId: integer('tenant_id')
+      .notNull()
+      .references(() => tenants.id),
     scaleId: integer('scale_id')
       .notNull()
       .references(() => discountScales.id, { onDelete: 'cascade' }),
@@ -423,6 +580,7 @@ export const discountApplications = pgTable(
     // upsert in computeDiscount is race-safe. Client scales have one row per calendar period;
     // supplier cycle grants always use a fresh timestamp as `period`, so this never conflicts there.
     uniqueIndex('discount_applications_scale_period_idx').on(table.scaleId, table.period),
+    index('discount_applications_tenant_id_idx').on(table.tenantId),
   ],
 )
 

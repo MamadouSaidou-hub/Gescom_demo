@@ -2,14 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAppSettings, updateAppSettings } from '@/lib/db/mutations'
 import { toApiErrorMessage } from '@/lib/api-error'
 import { getSessionContext, isAdmin } from '@/lib/session'
-import { primeSettingsCache } from '@/lib/settings-cache'
+import { primeTenantBranding } from '@/lib/settings-cache'
 
 export async function GET() {
   const ctx = await getSessionContext()
   if (!ctx) return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 })
   if (!isAdmin(ctx)) return NextResponse.json({ error: 'Réservé aux administrateurs.' }, { status: 403 })
 
-  const settings = await getAppSettings()
+  const settings = await getAppSettings(ctx.tenantId)
   return NextResponse.json({ settings })
 }
 
@@ -44,8 +44,8 @@ export async function PATCH(request: NextRequest) {
   }
 
   try {
-    const settings = await updateAppSettings({ companyName, companyShortName, country, currency, companyAddress, companyPhone, companyEmail, logoDataUrl })
-    primeSettingsCache(settings)
+    const settings = await updateAppSettings(ctx.tenantId, { companyName, companyShortName, country, currency, companyAddress, companyPhone, companyEmail, logoDataUrl })
+    primeTenantBranding(ctx.tenantId, settings)
     return NextResponse.json({ settings })
   } catch (error) {
     return NextResponse.json({ error: toApiErrorMessage(error) }, { status: 400 })

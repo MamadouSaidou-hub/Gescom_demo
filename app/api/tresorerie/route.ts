@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
   const period = parsePeriodLabel(searchParams.get('period'), '7d')
   const store = searchParams.get('store')
 
-  const [data, storeOptions] = await Promise.all([getTreasuryOverview(period, store), getStoreOptions()])
+  const [data, storeOptions] = await Promise.all([getTreasuryOverview(ctx.tenantId, period, store), getStoreOptions(ctx.tenantId)])
 
   return NextResponse.json({
     ...data,
@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    await recordPayment({ clientId, amount, method, storeId })
+    await recordPayment(ctx.tenantId, { clientId, amount, method, storeId })
     return NextResponse.json({ ok: true }, { status: 201 })
   } catch (error) {
     return NextResponse.json({ error: toApiErrorMessage(error) }, { status: 400 })

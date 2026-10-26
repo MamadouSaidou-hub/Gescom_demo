@@ -13,12 +13,12 @@ export async function POST(_request: Request, { params }: { params: Promise<{ pa
   }
 
   if (partyType === 'client') {
-    const result = await computeDiscount('client', Number(partyId), currentPeriod())
+    const result = await computeDiscount(ctx.tenantId, 'client', Number(partyId), currentPeriod())
     return NextResponse.json({ result })
   }
 
   // Supplier: no calendar period — checks whether the current cycle has crossed a tier, grants it and
   // resets the cycle if so. Returns null (no grant yet) rather than a zeroed-out result.
-  const grant = await checkAndGrantSupplierCycle(Number(partyId))
+  const grant = await checkAndGrantSupplierCycle(ctx.tenantId, Number(partyId))
   return NextResponse.json({ result: grant })
 }

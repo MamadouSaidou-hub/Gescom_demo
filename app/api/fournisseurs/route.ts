@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
   if (!ctx) return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 })
   if (!isAdmin(ctx)) return NextResponse.json({ error: 'Réservé aux administrateurs.' }, { status: 403 })
 
-  const data = await getSuppliersOverview()
+  const data = await getSuppliersOverview(ctx.tenantId)
 
   if (request.nextUrl.searchParams.get('format') === 'csv') {
     return csvResponse(
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const supplier = await createSupplier({ name, phone: body.phone ? String(body.phone).trim() : undefined })
+    const supplier = await createSupplier(ctx.tenantId, { name, phone: body.phone ? String(body.phone).trim() : undefined })
     return NextResponse.json({ supplier }, { status: 201 })
   } catch (error) {
     return NextResponse.json({ error: toApiErrorMessage(error) }, { status: 400 })

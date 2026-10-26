@@ -1,10 +1,13 @@
 import { headers } from 'next/headers'
+import { eq } from 'drizzle-orm'
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db/client'
 import { user } from '@/lib/db/auth-schema'
 import { stores } from '@/lib/db/schema'
+import { withTenant } from '@/lib/db/tenant'
 import { toApiErrorMessage } from '@/lib/api-error'
+import { recordAuditEvent } from '@/lib/audit'
 import { getSessionContext, isAdmin } from '@/lib/session'
 
 export async function GET() {
@@ -12,8 +15,14 @@ export async function GET() {
   if (!ctx) return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 })
   if (!isAdmin(ctx)) return NextResponse.json({ error: 'Réservé aux administrateurs.' }, { status: 403 })
 
-  const userRows = await db.select({ id: user.id, name: user.name, email: user.email, role: user.role, storeId: user.storeId }).from(user)
-  const storeRows = await db.select({ id: stores.id, name: stores.name }).from(stores)
+  // `user` has no RLS (login must find a row by email before any tenant is known), so this
+  // filter is not defense-in-depth here — it's the only thing preventing this endpoint from
+  // listing every tenant's users.
+  const userRows = await db
+    .select({ id: user.id, name: user.name, email: user.email, role: user.role, storeId: user.storeId })
+    .from(user)
+    .where(eq(user.tenantId, ctx.tenantId))
+  const storeRows = await withTenant(ctx.tenantId, (tx) => tx.select({ id: stores.id, name: stores.name }).from(stores))
   const storeMap = new Map(storeRows.map((row) => [row.id, row.name]))
 
   return NextResponse.json({
@@ -50,12 +59,19 @@ export async function POST(request: NextRequest) {
   try {
     // Uses the admin plugin's create-user endpoint (not signUpEmail) so the calling admin's own
     // session cookie isn't overwritten by the newly created user's session.
-    await auth.api.createUser({
+    const created = await auth.api.createUser({
       // better-auth's admin plugin types `role` as 'user' | 'admin' by default (no custom access-control
       // roles configured, since we don't need permission granularity — just the isAdmin() checks above).
       // 'gestionnaire' is accepted at runtime (role is a free-text column), hence the cast.
-      body: { name, email, password, role: role as 'admin', data: { storeId } },
+      body: { name, email, password, role: role as 'admin', data: { tenantId: ctx.tenantId, storeId } },
       headers: await headers(),
+    })
+    await recordAuditEvent({
+      actor: ctx,
+      action: 'user.created',
+      targetType: 'user',
+      targetId: created.user.id,
+      payload: { email, name, role, storeId },
     })
     return NextResponse.json({ ok: true }, { status: 201 })
   } catch (error) {

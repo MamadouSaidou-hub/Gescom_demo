@@ -1,9 +1,11 @@
 import { and, eq } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { db } from '@/lib/db/client'
+import { withTenant } from '@/lib/db/tenant'
 import { clients, payments, products, receivables, saleItems, sales, stockLevels, stockMovements, stores } from '@/lib/db/schema'
 import { createSale } from '@/lib/db/mutations/sales'
 
+// Tenant 1 is the seeded demo tenant — see lib/db/seed.ts.
+const tenantId = 1
 const runId = `test-${Date.now()}-${Math.floor(Math.random() * 1e6)}`
 
 let storeId: number
@@ -13,53 +15,59 @@ let tonneProductId: number
 const saleIds: number[] = []
 
 async function stockOf(productId: number) {
-  const [row] = await db.select({ quantity: stockLevels.quantity }).from(stockLevels).where(and(eq(stockLevels.productId, productId), eq(stockLevels.storeId, storeId)))
-  return row?.quantity ?? 0
+  return withTenant(tenantId, async (tx) => {
+    const [row] = await tx.select({ quantity: stockLevels.quantity }).from(stockLevels).where(and(eq(stockLevels.productId, productId), eq(stockLevels.storeId, storeId)))
+    return row?.quantity ?? 0
+  })
 }
 
 beforeAll(async () => {
-  const [store] = await db.insert(stores).values({ name: `Magasin ${runId}`, city: 'Test' }).returning()
-  storeId = store.id
-  const [client] = await db.insert(clients).values({ name: `Client ${runId}`, storeId }).returning()
-  clientId = client.id
+  await withTenant(tenantId, async (tx) => {
+    const [store] = await tx.insert(stores).values({ tenantId, name: `Magasin ${runId}`, city: 'Test' }).returning()
+    storeId = store.id
+    const [client] = await tx.insert(clients).values({ tenantId, name: `Client ${runId}`, storeId }).returning()
+    clientId = client.id
 
-  const [sackProduct] = await db
-    .insert(products)
-    .values({ name: `Farine sac ${runId}`, sku: `SKU-SACK-${runId}`, category: 'Test', unitPrice: 1000, costPrice: 800 })
-    .returning()
-  sackProductId = sackProduct.id
+    const [sackProduct] = await tx
+      .insert(products)
+      .values({ tenantId, name: `Farine sac ${runId}`, sku: `SKU-SACK-${runId}`, category: 'Test', unitPrice: 1000, costPrice: 800 })
+      .returning()
+    sackProductId = sackProduct.id
 
-  const [tonneProduct] = await db
-    .insert(products)
-    .values({ name: `Farine tonne ${runId}`, sku: `SKU-TONNE-${runId}`, category: 'Test', unitPrice: 1000, costPrice: 800, sackWeightKg: 25 })
-    .returning()
-  tonneProductId = tonneProduct.id
+    const [tonneProduct] = await tx
+      .insert(products)
+      .values({ tenantId, name: `Farine tonne ${runId}`, sku: `SKU-TONNE-${runId}`, category: 'Test', unitPrice: 1000, costPrice: 800, sackWeightKg: 25 })
+      .returning()
+    tonneProductId = tonneProduct.id
 
-  await db.insert(stockLevels).values([
-    { productId: sackProductId, storeId, quantity: 100 },
-    { productId: tonneProductId, storeId, quantity: 100 },
-  ])
+    await tx.insert(stockLevels).values([
+      { tenantId, productId: sackProductId, storeId, quantity: 100 },
+      { tenantId, productId: tonneProductId, storeId, quantity: 100 },
+    ])
+  })
 })
 
 afterAll(async () => {
-  for (const saleId of saleIds) {
-    await db.delete(receivables).where(eq(receivables.saleId, saleId))
-    await db.delete(payments).where(eq(payments.saleId, saleId))
-    await db.delete(saleItems).where(eq(saleItems.saleId, saleId))
-    await db.delete(sales).where(eq(sales.id, saleId))
-  }
-  await db.delete(stockMovements).where(eq(stockMovements.storeId, storeId))
-  await db.delete(stockLevels).where(eq(stockLevels.storeId, storeId))
-  await db.delete(products).where(eq(products.id, sackProductId))
-  await db.delete(products).where(eq(products.id, tonneProductId))
-  await db.delete(clients).where(eq(clients.id, clientId))
-  await db.delete(stores).where(eq(stores.id, storeId))
+  await withTenant(tenantId, async (tx) => {
+    for (const saleId of saleIds) {
+      await tx.delete(receivables).where(eq(receivables.saleId, saleId))
+      await tx.delete(payments).where(eq(payments.saleId, saleId))
+      await tx.delete(saleItems).where(eq(saleItems.saleId, saleId))
+      await tx.delete(sales).where(eq(sales.id, saleId))
+    }
+    await tx.delete(stockMovements).where(eq(stockMovements.storeId, storeId))
+    await tx.delete(stockLevels).where(eq(stockLevels.storeId, storeId))
+    await tx.delete(products).where(eq(products.id, sackProductId))
+    await tx.delete(products).where(eq(products.id, tonneProductId))
+    await tx.delete(clients).where(eq(clients.id, clientId))
+    await tx.delete(stores).where(eq(stores.id, storeId))
+  })
 })
 
 describe('createSale', () => {
   it('deducts stock for a paid sale', async () => {
     const before = await stockOf(sackProductId)
-    const sale = await createSale({
+    const sale = await createSale(tenantId, {
       storeId,
       clientId: null,
       paymentStatus: 'paid',
@@ -72,7 +80,7 @@ describe('createSale', () => {
   })
 
   it('records both a payment and the correct receivable remainder for a partial sale', async () => {
-    const sale = await createSale({
+    const sale = await createSale(tenantId, {
       storeId,
       clientId,
       paymentStatus: 'partial',
@@ -82,17 +90,19 @@ describe('createSale', () => {
     })
     saleIds.push(sale.id)
 
-    const [payment] = await db.select().from(payments).where(eq(payments.saleId, sale.id))
+    const { payment, receivable } = await withTenant(tenantId, async (tx) => {
+      const [payment] = await tx.select().from(payments).where(eq(payments.saleId, sale.id))
+      const [receivable] = await tx.select().from(receivables).where(eq(receivables.saleId, sale.id))
+      return { payment, receivable }
+    })
     expect(payment?.amount).toBe(4000)
-
-    const [receivable] = await db.select().from(receivables).where(eq(receivables.saleId, sale.id))
     expect(receivable?.amount).toBe(6000)
   })
 
   it('rejects a sale when stock is insufficient and leaves stock unchanged', async () => {
     const before = await stockOf(sackProductId)
     await expect(
-      createSale({
+      createSale(tenantId, {
         storeId,
         clientId: null,
         paymentStatus: 'paid',
@@ -106,7 +116,7 @@ describe('createSale', () => {
 
   it('converts a tonne-unit sale to the correct sack count', async () => {
     const before = await stockOf(tonneProductId)
-    const sale = await createSale({
+    const sale = await createSale(tenantId, {
       storeId,
       clientId: null,
       paymentStatus: 'paid',
@@ -116,7 +126,10 @@ describe('createSale', () => {
     })
     saleIds.push(sale.id)
 
-    const [item] = await db.select().from(saleItems).where(eq(saleItems.saleId, sale.id))
+    const item = await withTenant(tenantId, async (tx) => {
+      const [row] = await tx.select().from(saleItems).where(eq(saleItems.saleId, sale.id))
+      return row
+    })
     expect(item.quantity).toBe(100)
     expect(item.unit).toBe('tonne')
     expect(item.tonnage).toBe(2.5)
@@ -125,7 +138,7 @@ describe('createSale', () => {
 
   it('rejects a tonne-unit sale for a product with no configured sack weight', async () => {
     await expect(
-      createSale({
+      createSale(tenantId, {
         storeId,
         clientId: null,
         paymentStatus: 'paid',

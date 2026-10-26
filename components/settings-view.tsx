@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { AppShell } from '@/components/app-shell'
 import { LoadError } from '@/components/load-error'
 import { fetchJson } from '@/lib/fetch-json'
+import { COUNTRY_OPTIONS, OTHER_COUNTRY, currencyForCountry, isKnownCountry } from '@/lib/countries'
 
 type AppSettings = {
   companyName: string
@@ -43,20 +44,6 @@ function resizeImageToDataUrl(file: File, maxDim: number): Promise<string> {
   })
 }
 
-// FCFA is the common screen label for both the UEMOA (XOF) and CEMAC (XAF) francs — intentionally
-// not the ISO code, per the team's call that "XOF" would confuse clients who only know "FCFA".
-const COUNTRY_OPTIONS = [
-  { name: 'Guinée', currency: 'GNF' },
-  { name: 'Sénégal', currency: 'FCFA' },
-  { name: 'Côte d’Ivoire', currency: 'FCFA' },
-  { name: 'Mali', currency: 'FCFA' },
-  { name: 'Burkina Faso', currency: 'FCFA' },
-  { name: 'Bénin', currency: 'FCFA' },
-  { name: 'Togo', currency: 'FCFA' },
-  { name: 'Niger', currency: 'FCFA' },
-  { name: 'Djibouti', currency: 'DJF' },
-]
-const OTHER_COUNTRY = 'Autre'
 
 export function SettingsView() {
   const router = useRouter()
@@ -72,7 +59,7 @@ export function SettingsView() {
     fetchJson<{ settings: AppSettings }>('/api/parametres')
       .then((json) => {
         setForm(json.settings)
-        setCustomCountry(!COUNTRY_OPTIONS.some((option) => option.name === json.settings.country))
+        setCustomCountry(!isKnownCountry(json.settings.country))
       })
       .catch((err) => setError(err instanceof Error ? err.message : 'Erreur inconnue.'))
       .finally(() => setLoading(false))
@@ -86,8 +73,7 @@ export function SettingsView() {
       return
     }
     setCustomCountry(false)
-    const preset = COUNTRY_OPTIONS.find((option) => option.name === value)
-    setForm({ ...form, country: value, currency: preset?.currency ?? form.currency })
+    setForm({ ...form, country: value, currency: currencyForCountry(value) ?? form.currency })
   }
 
   async function handleLogoChange(event: React.ChangeEvent<HTMLInputElement>) {

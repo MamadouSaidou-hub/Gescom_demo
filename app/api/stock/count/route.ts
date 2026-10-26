@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
   if (!ctx) return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 })
 
   const store = effectiveStoreParam(ctx, request.nextUrl.searchParams.get('store'))
-  const counts = await getStockCountHistory(store)
+  const counts = await getStockCountHistory(ctx.tenantId, store)
   return NextResponse.json({ counts })
 }
 
@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const result = await recordStockCount({ productId, storeId, countedQty, countedBy: ctx.userId })
+    const result = await recordStockCount(ctx.tenantId, { productId, storeId, countedQty, countedBy: ctx.userId })
     return NextResponse.json({ result }, { status: 201 })
   } catch (error) {
     return NextResponse.json({ error: toApiErrorMessage(error) }, { status: 400 })

@@ -12,9 +12,9 @@ export async function GET(request: NextRequest) {
   const store = effectiveStoreParam(ctx, searchParams.get('store'))
 
   const [data, storeOptions, dueAlerts] = await Promise.all([
-    getDashboardData(period, store),
-    getStoreOptions(),
-    getDueDateAlerts(isAdmin(ctx) ? null : ctx.storeId, isAdmin(ctx)),
+    getDashboardData(ctx.tenantId, period, store),
+    getStoreOptions(ctx.tenantId),
+    getDueDateAlerts(ctx.tenantId, isAdmin(ctx) ? null : ctx.storeId, isAdmin(ctx)),
   ])
 
   // La marge (coût vs prix de vente) est une donnée financière sensible, réservée aux admins —

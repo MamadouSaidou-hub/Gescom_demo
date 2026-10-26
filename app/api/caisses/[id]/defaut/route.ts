@@ -15,7 +15,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   }
 
   try {
-    const account = await setDefaultCashAccount(accountId)
+    const account = await setDefaultCashAccount(ctx.tenantId, accountId)
     return NextResponse.json({ account })
   } catch (error) {
     return NextResponse.json({ error: toApiErrorMessage(error) }, { status: 400 })

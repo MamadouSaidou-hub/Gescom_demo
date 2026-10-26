@@ -38,7 +38,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
 
   try {
-    const product = await updateProduct(productId, input)
+    const product = await updateProduct(ctx.tenantId, productId, input)
     return NextResponse.json({ product })
   } catch (error) {
     return NextResponse.json({ error: toApiErrorMessage(error) }, { status: 400 })

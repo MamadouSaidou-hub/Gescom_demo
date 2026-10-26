@@ -9,6 +9,6 @@ export async function GET(request: NextRequest) {
   if (!isAdmin(ctx)) return NextResponse.json({ error: 'Réservé aux administrateurs.' }, { status: 403 })
 
   const period = parsePeriodLabel(request.nextUrl.searchParams.get('period'), 'month')
-  const data = await getReportsOverview(period)
+  const data = await getReportsOverview(ctx.tenantId, period)
   return NextResponse.json(data)
 }

@@ -9,8 +9,9 @@
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "db:seed": "tsx lib/db/seed.ts",
-    "db:seed-admin": "tsx lib/db/seed-admin.ts",
+    "db:seed": "tsx --env-file=.env.local lib/db/seed.ts",
+    "db:seed-admin": "tsx --env-file=.env.local lib/db/seed-admin.ts",
+    "create-tenant": "tsx --env-file=.env.local scripts/create-tenant.ts",
     "test": "vitest run"
   },
   "dependencies": {

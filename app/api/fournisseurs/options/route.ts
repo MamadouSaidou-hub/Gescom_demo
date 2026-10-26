@@ -7,6 +7,6 @@ export async function GET() {
   if (!ctx) return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 })
   if (!isAdmin(ctx)) return NextResponse.json({ error: 'Réservé aux administrateurs.' }, { status: 403 })
 
-  const suppliers = await getSupplierOptions()
+  const suppliers = await getSupplierOptions(ctx.tenantId)
   return NextResponse.json({ suppliers })
 }
