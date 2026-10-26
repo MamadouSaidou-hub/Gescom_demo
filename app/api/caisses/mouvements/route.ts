@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { recordCashMovement } from '@/lib/db/mutations'
 import { cashMovementType } from '@/lib/db/schema'
 import { toApiErrorMessage } from '@/lib/api-error'
+import { isExpenseCategory } from '@/lib/expense-categories'
 import { getSessionContext, isAdmin } from '@/lib/session'
 
 export async function POST(request: NextRequest) {
@@ -20,9 +21,14 @@ export async function POST(request: NextRequest) {
   if (!Number.isFinite(cashAccountId) || !cashMovementType.includes(type) || !category || !Number.isFinite(amount) || amount <= 0) {
     return NextResponse.json({ error: 'Champs invalides ou manquants.' }, { status: 400 })
   }
+  // Enforced server-side too, not just by the dropdown — otherwise a direct API call could still
+  // write an arbitrary category and silently fragment the expense breakdown again.
+  if (type === 'expense' && !isExpenseCategory(category)) {
+    return NextResponse.json({ error: 'Catégorie de dépense invalide.' }, { status: 400 })
+  }
 
   try {
-    const movement = await recordCashMovement({ cashAccountId, type, category, description, amount, storeId })
+    const movement = await recordCashMovement(ctx.tenantId, { cashAccountId, type, category, description, amount, storeId })
     return NextResponse.json({ movement }, { status: 201 })
   } catch (error) {
     return NextResponse.json({ error: toApiErrorMessage(error) }, { status: 400 })
