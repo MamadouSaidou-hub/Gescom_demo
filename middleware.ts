@@ -9,7 +9,12 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
-  return NextResponse.next()
+  // Server components can't read the current path, and the suspended-workspace redirect in
+  // app/layout.tsx needs it to avoid redirecting the suspended page onto itself. This runs on the
+  // edge runtime, so it can't check the tenant's status here — only pass the path along.
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-pathname', request.nextUrl.pathname)
+  return NextResponse.next({ request: { headers: requestHeaders } })
 }
 
 export const config = {
