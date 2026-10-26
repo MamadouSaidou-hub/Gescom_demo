@@ -3,9 +3,11 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { withTenant } from '@/lib/db/tenant'
 import { clients, payments, products, receivables, saleItems, sales, stockLevels, stockMovements, stores } from '@/lib/db/schema'
 import { createSale } from '@/lib/db/mutations/sales'
+import { getTestTenantId } from './test-tenant'
 
-// Tenant 1 is the seeded demo tenant — see lib/db/seed.ts.
-const tenantId = 1
+// A dedicated tenant for the test suite, never tenant 1 (the demo tenant shown to prospects) —
+// see tests/test-tenant.ts for why.
+const tenantId = await getTestTenantId()
 const runId = `test-${Date.now()}-${Math.floor(Math.random() * 1e6)}`
 
 let storeId: number

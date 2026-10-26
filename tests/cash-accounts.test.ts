@@ -3,10 +3,11 @@ import { afterAll, describe, expect, it } from 'vitest'
 import { withTenant } from '@/lib/db/tenant'
 import { cashAccounts, cashMovements } from '@/lib/db/schema'
 import { createCashAccount, recordCashMovement } from '@/lib/db/mutations/cash-accounts'
+import { getTestTenantId } from './test-tenant'
 
-// Tenant 1 is the seeded "Barry-Gate / Démo" tenant that already exists in every dev/test
-// database for this repo — see lib/db/seed.ts.
-const tenantId = 1
+// A dedicated tenant for the test suite, never tenant 1 (the demo tenant shown to prospects) —
+// see tests/test-tenant.ts for why.
+const tenantId = await getTestTenantId()
 const runId = `test-${Date.now()}-${Math.floor(Math.random() * 1e6)}`
 const accountIds: number[] = []
 

@@ -3,12 +3,13 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { withTenant } from '@/lib/db/tenant'
 import { clients, discountApplications, discountScales, discountTiers, products, sales, stores, supplierDeliveries, suppliers } from '@/lib/db/schema'
 import { checkAndGrantSupplierCycle, computeDiscount, getSupplierCycleProgress, setDiscountTiers } from '@/lib/db/mutations/discounts'
+import { getTestTenantId } from './test-tenant'
 
 // Integration test — runs against the real Postgres DB (no separate test DB available). Every
 // fixture is suffixed with a unique run id and cleaned up in afterAll by id, so it never touches
-// or depends on any other row in the shared tables. Tenant 1 is the seeded demo tenant — see
-// lib/db/seed.ts.
-const tenantId = 1
+// or depends on any other row in the shared tables. A dedicated tenant, never tenant 1 (the demo
+// tenant shown to prospects) — see tests/test-tenant.ts.
+const tenantId = await getTestTenantId()
 const runId = `test-${Date.now()}-${Math.floor(Math.random() * 1e6)}`
 
 let supplierId: number

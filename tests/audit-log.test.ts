@@ -3,12 +3,14 @@ import { afterAll, describe, expect, it } from 'vitest'
 import { db } from '@/lib/db/client'
 import { auditLog } from '@/lib/db/schema'
 import { recordAuditEvent, verifyAuditChain } from '@/lib/audit'
+import { getTestTenantId } from './test-tenant'
 
 // Integration test against the real database — the guarantees being tested (hash chaining, and
 // append-only enforced by Postgres privileges) live in the database, not in application code, so
 // mocking would test nothing of value.
 const runId = `audit-test-${Date.now()}-${Math.floor(Math.random() * 1e6)}`
-const actor = { userId: `test-${runId}`, email: `${runId}@test.local`, tenantId: 1 }
+const testTenantId = await getTestTenantId()
+const actor = { userId: `test-${runId}`, email: `${runId}@test.local`, tenantId: testTenantId }
 
 afterAll(async () => {
   // app_runtime deliberately has no DELETE on audit_log, so cleanup needs the owner connection —
