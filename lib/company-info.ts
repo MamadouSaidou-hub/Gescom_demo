@@ -10,5 +10,5 @@ export const companyInfo = {
   phone: '629 59 09 64',
   phoneIntl: '+224629590964',
   email: 'hafizbillebarry@gmail.com',
-  logoPath: '/logo-bgm.jpeg',
+  logoPath: '/logo-saal.jpg',
 }
