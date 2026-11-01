@@ -5,6 +5,7 @@ import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import './globals.css'
 import { getDefaultBranding, getTenantBranding } from '@/lib/settings-cache'
+import { companyInfo } from '@/lib/company-info'
 import { getSessionState } from '@/lib/session'
 import { SettingsProvider } from '@/components/settings-provider'
 
@@ -40,9 +41,16 @@ export const dynamic = 'force-dynamic'
 
 export async function generateMetadata(): Promise<Metadata> {
   const branding = await resolveRequestBranding()
+  const title = `${branding.companyShortName} · Tableau de bord`
+  const description = 'Pilotez vos magasins, vos ventes et votre trésorerie depuis un seul espace.'
+  // Link-preview crawlers (WhatsApp, etc.) never carry a session cookie, so they always see the
+  // platform's default branding regardless of which page's URL was shared — same as this function
+  // already resolves above. Without an explicit og:image, crawlers fell back to the static favicon
+  // (app/icon.jpeg), which stayed the old logo even after the default logo was changed elsewhere.
+  const ogImage = companyInfo.logoPath
   return {
-    title: `${branding.companyShortName} · Tableau de bord`,
-    description: 'Pilotez vos magasins, vos ventes et votre trésorerie depuis un seul espace.',
+    title,
+    description,
     generator: `${branding.companyShortName} ${branding.companyName}`,
     manifest: '/manifest.webmanifest',
     appleWebApp: {
@@ -51,6 +59,8 @@ export async function generateMetadata(): Promise<Metadata> {
       title: branding.companyShortName,
     },
     formatDetection: { telephone: false },
+    openGraph: { title, description, images: [{ url: ogImage, width: 1280, height: 1280 }] },
+    twitter: { card: 'summary', title, description, images: [ogImage] },
   }
 }
 
