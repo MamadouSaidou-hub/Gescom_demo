@@ -30,11 +30,12 @@ export async function createTransfer(
       }
     }
 
-    const [{ count }] = await tx
-      .select({ count: sql<number>`count(*)`.mapWith(Number) })
-      .from(transfers)
-      .where(eq(transfers.tenantId, tenantId))
-    const reference = `TR-${1000 + count + 1}`
+    // A Postgres sequence (not a count of existing rows) — counting breaks the moment a transfer
+    // is deleted (reused number) or, as happened in production, when two different tenants each
+    // compute their own "first transfer" candidate and collide on the column's global unique
+    // constraint. nextval() is atomic and globally monotonic regardless of tenant.
+    const seqResult = await tx.execute<{ next: string }>(sql`SELECT nextval('transfers_reference_seq') AS next`)
+    const reference = `TR-${seqResult.rows[0].next}`
 
     const [transfer] = await tx
       .insert(transfers)

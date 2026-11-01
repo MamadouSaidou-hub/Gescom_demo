@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createTenant, listTenants } from '@/lib/db/mutations'
-import { toApiErrorMessage } from '@/lib/api-error'
+import { pgConstraintName, toApiErrorMessage } from '@/lib/api-error'
 import { recordAuditEvent } from '@/lib/audit'
 import { getSessionContext, isPlatformAdmin } from '@/lib/session'
 
@@ -53,9 +53,12 @@ export async function POST(request: NextRequest) {
     })
     return NextResponse.json({ tenant }, { status: 201 })
   } catch (error) {
-    const message = error instanceof Error ? error.message : ''
-    if (message.includes('tenants_slug_key')) return NextResponse.json({ error: 'Ce slug est déjà utilisé par un autre tenant.' }, { status: 400 })
-    if (message.includes('user_email_unique') || message.includes('"user_email')) {
+    const constraint = pgConstraintName(error)
+    if (constraint === 'tenants_slug_key') return NextResponse.json({ error: 'Ce slug est déjà utilisé par un autre tenant.' }, { status: 400 })
+    if (constraint === 'user_email_unique') return NextResponse.json({ error: 'Cet e-mail admin est déjà utilisé par un compte existant.' }, { status: 400 })
+    // better-auth's own createUser checks for a duplicate email itself, before any INSERT runs —
+    // no Postgres error to catch above, just its own English APIError message.
+    if (error instanceof Error && error.message.includes('already exists')) {
       return NextResponse.json({ error: 'Cet e-mail admin est déjà utilisé par un compte existant.' }, { status: 400 })
     }
     return NextResponse.json({ error: toApiErrorMessage(error) }, { status: 400 })
