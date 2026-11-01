@@ -270,7 +270,7 @@ export function AppShell({
         <div className="brand-lockup">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={`/api/logo?v=${logoVersion}`} alt={companyShortName} className="brand-mark" />
-          <div><strong>{companyShortName}</strong><span>{companyName}</span></div>
+          <div><strong title={companyShortName}>{companyShortName}</strong><span title={companyName}>{companyName}</span></div>
           <button className="mobile-close" onClick={() => setMenuOpen(false)} aria-label="Fermer le menu"><X /></button>
         </div>
         <div className="workspace-select"><span className="workspace-dot" /><span>Direction générale</span><ChevronDown aria-hidden="true" /></div>

@@ -37,8 +37,8 @@ export default function LoginPage() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={`/api/logo?v=${logoVersion}`} alt={companyShortName} className="brand-mark" />
           <div>
-            <strong>{companyShortName}</strong>
-            <span>{companyName}</span>
+            <strong title={companyShortName}>{companyShortName}</strong>
+            <span title={companyName}>{companyName}</span>
           </div>
         </div>
         <form onSubmit={handleSubmit}>
