@@ -48,7 +48,7 @@ async function buildInvoicePdf(sale: SaleDetail, branding: AppSettings) {
   const doc = new jsPDF()
   const pageWidth = doc.internal.pageSize.getWidth()
 
-  const logoDataUrl = await loadImageAsDataUrl('/api/logo')
+  const logoDataUrl = await loadImageAsDataUrl(`/api/logo?v=${branding.logoVersion}`)
   if (logoDataUrl) {
     try {
       const format = logoDataUrl.includes('image/png') ? 'PNG' : 'JPEG'

@@ -87,6 +87,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
     address: branding.companyAddress,
     phone: branding.companyPhone,
     email: branding.companyEmail,
+    logoVersion: branding.logoVersion,
   }
 
   return (

@@ -11,6 +11,14 @@ export async function GET(request: NextRequest) {
   const branding = ctx ? await getTenantBranding(ctx.tenantId) : getDefaultBranding()
   const logo = branding.logoPath
 
+  // Every consumer of this route appends `?v=<logoVersion>` (a hash of the logo itself — see
+  // settings-cache.ts), so the URL only ever changes when the logo's bytes do. That means we can
+  // cache this response essentially forever: there is no "stale" version of a given URL to worry
+  // about, so there's no need for a short max-age/cache-clearing dance on every logo change.
+  // Requests missing `?v=` (an old cached page shell, a direct hit) fall back to a short TTL.
+  const hasVersion = request.nextUrl.searchParams.has('v')
+  const cacheControl = hasVersion ? 'public, max-age=31536000, immutable' : 'private, max-age=60'
+
   if (!logo.startsWith('data:')) {
     return NextResponse.redirect(new URL(logo, request.url), 307)
   }
@@ -23,7 +31,7 @@ export async function GET(request: NextRequest) {
   return new NextResponse(bytes, {
     headers: {
       'Content-Type': mimeType,
-      'Cache-Control': 'private, max-age=60',
+      'Cache-Control': cacheControl,
     },
   })
 }

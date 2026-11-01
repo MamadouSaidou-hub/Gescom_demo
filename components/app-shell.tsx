@@ -262,14 +262,14 @@ export function AppShell({
   const permissions = parsePermissions((session?.user as { permissions?: string } | undefined)?.permissions)
   const canSee = (item: { adminOnly: boolean; permission?: Permission }) =>
     (isAdmin || !item.adminOnly) && (isAdmin || !item.permission || permissions.includes(item.permission))
-  const { companyName, companyShortName } = useSettings()
+  const { companyName, companyShortName, logoVersion } = useSettings()
 
   return (
     <div className="app-frame">
       <aside className={`sidebar ${menuOpen ? 'sidebar-open' : ''}`}>
         <div className="brand-lockup">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/api/logo" alt={companyShortName} className="brand-mark" />
+          <img src={`/api/logo?v=${logoVersion}`} alt={companyShortName} className="brand-mark" />
           <div><strong>{companyShortName}</strong><span>{companyName}</span></div>
           <button className="mobile-close" onClick={() => setMenuOpen(false)} aria-label="Fermer le menu"><X /></button>
         </div>

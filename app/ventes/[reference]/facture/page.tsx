@@ -34,7 +34,7 @@ export default async function Page({ params }: { params: Promise<{ reference: st
           <div className="invoice-header">
             <div className="invoice-brand">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/api/logo" alt={branding.companyName} style={{ width: 64, height: 64, objectFit: 'contain', flexShrink: 0 }} />
+              <img src={`/api/logo?v=${branding.logoVersion}`} alt={branding.companyName} style={{ width: 64, height: 64, objectFit: 'contain', flexShrink: 0 }} />
               <div>
                 <div style={{ fontSize: 17, fontWeight: 800, color: NAVY, letterSpacing: '-.3px' }}>{branding.companyName}</div>
                 <div style={{ fontSize: 10, color: '#2e9e3f', fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', margin: '2px 0 6px' }}>{companyInfo.tagline}</div>

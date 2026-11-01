@@ -7,7 +7,7 @@ import { useSettings } from '@/components/settings-provider'
 
 export default function LoginPage() {
   const router = useRouter()
-  const { companyName, companyShortName } = useSettings()
+  const { companyName, companyShortName, logoVersion } = useSettings()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -35,7 +35,7 @@ export default function LoginPage() {
       <div className="modal-panel" style={{ width: '100%', maxWidth: 360 }}>
         <div className="brand-lockup" style={{ paddingBottom: 18 }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/api/logo" alt={companyShortName} className="brand-mark" />
+          <img src={`/api/logo?v=${logoVersion}`} alt={companyShortName} className="brand-mark" />
           <div>
             <strong>{companyShortName}</strong>
             <span>{companyName}</span>
