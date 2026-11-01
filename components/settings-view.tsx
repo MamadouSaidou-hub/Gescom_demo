@@ -152,11 +152,11 @@ export function SettingsView() {
             </div>
             <div className="form-field">
               <label>Nom de l’entreprise</label>
-              <input required value={form.companyName} onChange={(event) => setForm({ ...form, companyName: event.target.value })} placeholder="Ex : Barry-Gate Multi Service" />
+              <input required value={form.companyName} onChange={(event) => setForm({ ...form, companyName: event.target.value })} placeholder="Ex : SAAL Multi Services" />
             </div>
             <div className="form-field">
               <label>Sigle / nom court (sidebar, factures)</label>
-              <input required value={form.companyShortName} onChange={(event) => setForm({ ...form, companyShortName: event.target.value })} placeholder="Ex : BGM" />
+              <input required value={form.companyShortName} onChange={(event) => setForm({ ...form, companyShortName: event.target.value })} placeholder="Ex : SAAL" />
             </div>
             <div className="form-row">
               <div className="form-field">

@@ -1,4 +1,4 @@
-export const THEME_STORAGE_KEY = 'bgm-theme'
+export const THEME_STORAGE_KEY = 'app-theme'
 
 export type ThemeMode = 'light' | 'dark' | 'system'
 

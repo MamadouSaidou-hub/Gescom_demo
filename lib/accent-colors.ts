@@ -1,4 +1,4 @@
-export const ACCENT_STORAGE_KEY = 'bgm-accent-color'
+export const ACCENT_STORAGE_KEY = 'app-accent-color'
 
 export const accentColors = [
   { name: 'Marine', value: '#0b2e5c' },

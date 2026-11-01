@@ -28,9 +28,9 @@ function daysAgo(days: number, hours = 0, minutes = 0) {
   return date.toISOString()
 }
 
-// Reseeds one tenant's demo data. Defaults to tenant 1 (the original "Barry-Gate / Démo" tenant
-// created when this app was converted to multi-tenant) — pass a different id to reseed another
-// tenant instead: `npx tsx lib/db/seed.ts 2`.
+// Reseeds one tenant's demo data. Defaults to tenant 1 (the original demo tenant created when this
+// app was converted to multi-tenant) — pass a different id to reseed another tenant instead:
+// `npx tsx lib/db/seed.ts 2`.
 const tenantId = Number(process.argv[2] ?? 1)
 
 async function seed() {
@@ -60,9 +60,9 @@ async function seed() {
     const [akwa, bonapriso, bastos] = await db
       .insert(stores)
       .values([
-        { tenantId, name: 'BGM Akwa', city: 'Douala' },
-        { tenantId, name: 'BGM Bonapriso', city: 'Douala' },
-        { tenantId, name: 'BGM Bastos', city: 'Yaoundé' },
+        { tenantId, name: 'SAAL Kaloum', city: 'Conakry' },
+        { tenantId, name: 'SAAL Matam', city: 'Conakry' },
+        { tenantId, name: 'SAAL Ratoma', city: 'Conakry' },
       ])
       .returning()
 
