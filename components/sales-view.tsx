@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { ChevronDown, CreditCard, Plus, Receipt, Search, ShoppingCart, Trash2, WalletCards } from 'lucide-react'
+import { ChevronDown, CreditCard, Plus, Receipt, ScanLine, Search, ShoppingCart, Trash2, WalletCards } from 'lucide-react'
 import { AppShell } from '@/components/app-shell'
 import { Modal } from '@/components/modal'
 import { LoadError } from '@/components/load-error'
@@ -67,6 +67,8 @@ function NewSaleForm({
   const [paidNow, setPaidNow] = useState('')
   const [dueInDays, setDueInDays] = useState('15')
   const [items, setItems] = useState<ItemRow[]>([{ productId: '', quantity: '1', unitPrice: '', unit: 'sack', tonnage: '' }])
+  const [scanCode, setScanCode] = useState('')
+  const [scanError, setScanError] = useState('')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
@@ -94,6 +96,39 @@ function NewSaleForm({
   function handleProductChange(index: number, productId: string) {
     const product = productMap.get(productId)
     updateItem(index, { productId, unitPrice: product ? String(product.unitPrice) : '', unit: 'sack', tonnage: '' })
+  }
+
+  // A barcode scanner behaves exactly like a keyboard typing fast, then pressing Enter — so a
+  // plain text input with an Enter handler is all scanning needs, no special hardware integration.
+  // The scanned code only ever picks WHICH product goes in the cart; the price is still whatever
+  // the catalog says (same `handleProductChange`/`productMap` path as the dropdown), never trusted
+  // from the barcode itself.
+  function handleScan(event: React.KeyboardEvent<HTMLInputElement>) {
+    if (event.key !== 'Enter') return
+    event.preventDefault()
+    const code = scanCode.trim()
+    setScanCode('')
+    if (!code) return
+
+    const product = productOptions.find((option) => option.sku.toLowerCase() === code.toLowerCase())
+    if (!product) {
+      setScanError(`Code-barres inconnu : ${code}`)
+      return
+    }
+    setScanError('')
+
+    setItems((rows) => {
+      const sackRowIndex = rows.findIndex((row) => row.productId === String(product.id) && row.unit === 'sack')
+      if (sackRowIndex !== -1) {
+        return rows.map((row, i) => (i === sackRowIndex ? { ...row, quantity: String((Number(row.quantity) || 0) + 1) } : row))
+      }
+      const scannedRow: ItemRow = { productId: String(product.id), quantity: '1', unitPrice: String(product.unitPrice), unit: 'sack', tonnage: '' }
+      const emptyRowIndex = rows.findIndex((row) => !row.productId)
+      if (emptyRowIndex !== -1) {
+        return rows.map((row, i) => (i === emptyRowIndex ? scannedRow : row))
+      }
+      return [...rows, scannedRow]
+    })
   }
 
   function addItem() {
@@ -200,6 +235,18 @@ function NewSaleForm({
             </select>
           )}
         </div>
+      </div>
+
+      <div className="form-field">
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}><ScanLine size={14} /> Scanner un code-barres</label>
+        <input
+          autoFocus
+          value={scanCode}
+          onChange={(event) => setScanCode(event.target.value)}
+          onKeyDown={handleScan}
+          placeholder="Scannez ou tapez un code-barres puis Entrée"
+        />
+        {scanError && <p className="form-error" style={{ marginTop: 4 }}>{scanError}</p>}
       </div>
 
       <label style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', display: 'block', marginBottom: 6 }}>Articles</label>

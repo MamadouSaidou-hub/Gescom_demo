@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { AlertTriangle, ChevronDown, ClipboardCheck, Layers, Package, PackagePlus, Plus, Search, Store, Truck, Wallet } from 'lucide-react'
+import { AlertTriangle, ChevronDown, ClipboardCheck, Layers, Package, PackagePlus, Plus, Search, Store, Truck, Upload, Wallet } from 'lucide-react'
 import { AppShell } from '@/components/app-shell'
 import { downloadCsv } from '@/lib/download-csv'
 import { fetchJson } from '@/lib/fetch-json'
@@ -153,6 +153,81 @@ function NewProductForm({ storeOptions, onCreated }: { storeOptions: StoreOption
         </select>
       </div>
       <div className="form-actions"><button type="submit" className="btn-primary" disabled={submitting}>{submitting ? 'Création...' : 'Créer l’article'}</button></div>
+    </form>
+  )
+}
+
+function ImportProductsForm({ storeOptions, onImported }: { storeOptions: StoreOption[]; onImported: () => void }) {
+  const [storeId, setStoreId] = useState('')
+  const [file, setFile] = useState<File | null>(null)
+  const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [result, setResult] = useState<{ imported: number; skipped: { row: number; reason: string }[] } | null>(null)
+
+  useEffect(() => {
+    if (!storeId && storeOptions.length > 0) setStoreId(String(storeOptions[0].id))
+  }, [storeOptions, storeId])
+
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault()
+    if (!file) {
+      setError('Choisissez un fichier .csv ou .xlsx.')
+      return
+    }
+    setError('')
+    setResult(null)
+    setSubmitting(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('storeId', storeId)
+      const res = await fetch('/api/products/import', { method: 'POST', body: formData })
+      const json = await res.json()
+      if (!res.ok) {
+        setError(json.error ?? 'Une erreur est survenue.')
+        return
+      }
+      setResult(json)
+      onImported()
+    } catch {
+      setError('Connexion instable — impossible de contacter le serveur. Réessayez.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit}>
+      {error && <p className="form-error">{error}</p>}
+      <p className="section-subtitle">
+        Fichier .csv ou .xlsx avec les colonnes : <strong>Code-barres</strong> (optionnel), <strong>Nom</strong>, <strong>Catégorie</strong>,{' '}
+        <strong>Prix d’achat</strong>, <strong>Prix de vente</strong>, <strong>Stock initial</strong> (optionnel), <strong>Seuil d’alerte</strong> (optionnel).
+      </p>
+      <div className="form-field">
+        <label>Magasin cible (pour le stock initial)</label>
+        <select required value={storeId} onChange={(event) => setStoreId(event.target.value)}>
+          {storeOptions.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
+        </select>
+      </div>
+      <div className="form-field">
+        <label>Fichier</label>
+        <input required type="file" accept=".csv,.xlsx,.xls" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
+      </div>
+      <div className="form-actions"><button type="submit" className="btn-primary" disabled={submitting}>{submitting ? 'Import...' : 'Importer'}</button></div>
+
+      {result && (
+        <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border, #e3e9f1)' }}>
+          <p style={{ fontWeight: 700, color: 'var(--green, #2e9e3f)' }}>{result.imported} produit(s) importé(s).</p>
+          {result.skipped.length > 0 && (
+            <>
+              <p style={{ fontWeight: 700, color: 'var(--red, #d1453d)', marginTop: 8 }}>{result.skipped.length} ligne(s) ignorée(s) :</p>
+              <ul style={{ fontSize: 12, color: 'var(--muted)', paddingLeft: 18 }}>
+                {result.skipped.map((s, index) => <li key={index}>Ligne {s.row} : {s.reason}</li>)}
+              </ul>
+            </>
+          )}
+        </div>
+      )}
     </form>
   )
 }
@@ -354,6 +429,7 @@ export function StockView() {
   const [storeOptions, setStoreOptions] = useState<StoreOption[]>([])
   const [productOptions, setProductOptions] = useState<ProductOption[]>([])
   const [productModalOpen, setProductModalOpen] = useState(false)
+  const [importModalOpen, setImportModalOpen] = useState(false)
   const [receptionModalOpen, setReceptionModalOpen] = useState(false)
   const [countModalOpen, setCountModalOpen] = useState(false)
   const [detailProduct, setDetailProduct] = useState<StockProduct | null>(null)
@@ -402,11 +478,15 @@ export function StockView() {
     )
   }, [data, search])
 
+  function refreshData() {
+    setRefreshKey((key) => key + 1)
+  }
+
   function refresh() {
     setProductModalOpen(false)
     setReceptionModalOpen(false)
     setCountModalOpen(false)
-    setRefreshKey((key) => key + 1)
+    refreshData()
   }
 
   return (
@@ -432,6 +512,7 @@ export function StockView() {
           <Search aria-hidden="true" />
           <input placeholder="Rechercher un article, une référence..." value={search} onChange={(event) => setSearch(event.target.value)} aria-label="Rechercher un article" />
         </div>
+        <button className="btn-secondary" onClick={() => setImportModalOpen(true)}><Upload size={14} /> Importer un catalogue</button>
         <button className="btn-secondary" onClick={() => setReceptionModalOpen(true)}><PackagePlus size={14} /> Réception stock</button>
         <button className="btn-secondary" onClick={() => setCountModalOpen(true)}><ClipboardCheck size={14} /> Comptage physique</button>
         <button className="btn-primary" onClick={() => setProductModalOpen(true)}><Plus size={14} /> Nouvel article</button>
@@ -493,6 +574,9 @@ export function StockView() {
 
       <Modal open={productModalOpen} onClose={() => setProductModalOpen(false)} title="Nouvel article" subtitle="Ajoutez un article au catalogue et son stock de départ.">
         <NewProductForm storeOptions={storeOptions} onCreated={refresh} />
+      </Modal>
+      <Modal open={importModalOpen} onClose={() => setImportModalOpen(false)} title="Importer un catalogue" subtitle="Créez plusieurs articles d’un coup depuis un fichier." wide>
+        <ImportProductsForm storeOptions={storeOptions} onImported={refreshData} />
       </Modal>
       <Modal open={receptionModalOpen} onClose={() => setReceptionModalOpen(false)} title="Réception stock" subtitle="Enregistrez l’arrivée d’articles dans un magasin.">
         <StockReceptionForm storeOptions={storeOptions} productOptions={productOptions} onCreated={refresh} />
