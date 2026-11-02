@@ -2,7 +2,7 @@ import { and, eq, sql } from 'drizzle-orm'
 import { withTenant } from '../tenant'
 import { payments, paymentMethod, products, receivables, saleItems, sales, stockLevels, stockMovements } from '../schema'
 import { getQuantity } from './shared'
-import { businessConfig } from '@/lib/business-config'
+import { getTenantBranding } from '@/lib/settings-cache'
 import { recordAutoCashMovement } from './cash-accounts'
 
 export async function createSale(
@@ -21,6 +21,7 @@ export async function createSale(
     throw new Error('Une vente doit contenir au moins un article.')
   }
   const method = input.method ?? 'cash'
+  const branding = await getTenantBranding(tenantId)
 
   const sale = await withTenant(tenantId, async (tx) => {
     const productRows = await tx.select().from(products).where(eq(products.tenantId, tenantId))
@@ -37,12 +38,19 @@ export async function createSale(
 
       if (item.unit === 'tonne') {
         if (!product.sackWeightKg) {
-          throw new Error(
-            `Ce produit n'a pas de poids de ${businessConfig.unit.baseSingularLower} configuré, vente en ${businessConfig.unit.bulkLabel.toLowerCase()}s impossible.`,
-          )
+          const configField = branding.unitConversionMode === 'count' ? `nombre de ${branding.unitBasePluralLower} par ${branding.unitBulkSingular.toLowerCase()}` : `poids de ${branding.unitBaseSingularLower}`
+          throw new Error(`Ce produit n'a pas de ${configField} configuré, vente en ${branding.unitBulkPlural.toLowerCase()} impossible.`)
         }
         const tonnage = item.tonnage ?? 0
-        const quantity = Math.round((tonnage * businessConfig.unit.bulkConversionFactor) / product.sackWeightKg)
+        // 'count' mode: sackWeightKg holds "base units per bulk unit" directly (e.g. pieces per
+        // carton) — multiply. 'weight' mode: it holds a weight, and the bulk amount is converted
+        // through unitBulkConversionFactor (e.g. kg per tonne) before dividing — same formula
+        // already fixed once for BILMS's count-based case, now generalized per tenant here instead
+        // of hardcoded to one mode.
+        const quantity =
+          branding.unitConversionMode === 'count'
+            ? Math.round(tonnage * product.sackWeightKg)
+            : Math.round((tonnage * branding.unitBulkConversionFactor) / product.sackWeightKg)
         return { ...item, quantity, unitPrice, unit: 'tonne' as const, tonnage }
       }
       return { ...item, unitPrice, unit: 'sack' as const, tonnage: null }

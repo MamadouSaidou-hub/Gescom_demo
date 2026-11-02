@@ -27,6 +27,14 @@ export async function PATCH(request: NextRequest) {
   const companyPhone = body.companyPhone ? String(body.companyPhone).trim() : null
   const companyEmail = body.companyEmail ? String(body.companyEmail).trim() : null
   const logoDataUrl = body.logoDataUrl ? String(body.logoDataUrl) : null
+  const unitBaseSingular = body.unitBaseSingular ? String(body.unitBaseSingular).trim() : null
+  const unitBasePlural = body.unitBasePlural ? String(body.unitBasePlural).trim() : null
+  const unitBulkSingular = body.unitBulkSingular ? String(body.unitBulkSingular).trim() : null
+  const unitBulkPlural = body.unitBulkPlural ? String(body.unitBulkPlural).trim() : null
+  const unitConversionMode = body.unitConversionMode === 'count' || body.unitConversionMode === 'weight' ? body.unitConversionMode : null
+  const unitBulkConversionFactor = body.unitBulkConversionFactor !== undefined && body.unitBulkConversionFactor !== null && body.unitBulkConversionFactor !== ''
+    ? Number(body.unitBulkConversionFactor)
+    : null
 
   if (!companyName || !companyShortName || !country || !currency) {
     return NextResponse.json({ error: 'Tous les champs sont requis.' }, { status: 400 })
@@ -42,9 +50,27 @@ export async function PATCH(request: NextRequest) {
   if (logoDataUrl && !logoDataUrl.startsWith('data:image/')) {
     return NextResponse.json({ error: 'Format de logo invalide.' }, { status: 400 })
   }
+  if (unitBulkConversionFactor !== null && (!Number.isFinite(unitBulkConversionFactor) || unitBulkConversionFactor <= 0)) {
+    return NextResponse.json({ error: 'Le facteur de conversion doit être un nombre positif.' }, { status: 400 })
+  }
 
   try {
-    const settings = await updateAppSettings(ctx.tenantId, { companyName, companyShortName, country, currency, companyAddress, companyPhone, companyEmail, logoDataUrl })
+    const settings = await updateAppSettings(ctx.tenantId, {
+      companyName,
+      companyShortName,
+      country,
+      currency,
+      companyAddress,
+      companyPhone,
+      companyEmail,
+      logoDataUrl,
+      unitBaseSingular,
+      unitBasePlural,
+      unitBulkSingular,
+      unitBulkPlural,
+      unitConversionMode,
+      unitBulkConversionFactor,
+    })
     primeTenantBranding(ctx.tenantId, settings)
     return NextResponse.json({ settings })
   } catch (error) {

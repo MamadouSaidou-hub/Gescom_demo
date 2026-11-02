@@ -23,8 +23,13 @@ export type ReportsData = {
 
 const PRIMARY_RGB: [number, number, number] = [11, 46, 92] // matches --primary in app/globals.css
 
-export type ReportBranding = { companyShortName: string; currency: string }
-const defaultBranding: ReportBranding = { companyShortName: companyInfo.shortName, currency: businessConfig.currency }
+export type ReportBranding = { companyShortName: string; currency: string; unitBasePlural: string; unitBasePluralLower: string }
+const defaultBranding: ReportBranding = {
+  companyShortName: companyInfo.shortName,
+  currency: businessConfig.currency,
+  unitBasePlural: businessConfig.unit.basePlural,
+  unitBasePluralLower: businessConfig.unit.basePluralLower,
+}
 
 function docTitle(periodLabel: string) {
   const generatedAt = new Date().toLocaleString('fr-FR', { dateStyle: 'long', timeStyle: 'short' })
@@ -86,7 +91,7 @@ export function exportReportPdf(data: ReportsData, periodLabel: string, branding
 
   autoTable(doc, {
     startY: 24,
-    head: [['Produit', `Quantité (${businessConfig.unit.basePluralLower})`, 'Chiffre d’affaires', 'Marge']],
+    head: [['Produit', `Quantité (${branding.unitBasePluralLower})`, 'Chiffre d’affaires', 'Marge']],
     body: data.topProducts.map((row) => [row.name, String(row.quantity), row.formatted, row.marginFormatted]),
     theme: 'striped',
     headStyles: { fillColor: PRIMARY_RGB },
@@ -154,7 +159,7 @@ export function exportReportExcel(data: ReportsData, periodLabel: string, brandi
     ['Marge (%)', Number(data.marginPct.toFixed(1))],
     ['Nombre de ventes', data.salesCount],
     [`Panier moyen (${branding.currency})`, Math.round(data.avgBasket)],
-    [`${businessConfig.unit.basePlural} reçus (fournisseurs)`, data.supplierSummary.totalSacks],
+    [`${branding.unitBasePlural} reçus (fournisseurs)`, data.supplierSummary.totalSacks],
     ['Livraisons fournisseurs', data.supplierSummary.deliveriesCount],
     [`Payé aux fournisseurs (${branding.currency})`, data.supplierSummary.totalPaid],
   ])
@@ -174,7 +179,7 @@ export function exportReportExcel(data: ReportsData, periodLabel: string, brandi
   const productsSheet = XLSX.utils.json_to_sheet(
     data.topProducts.map((row) => ({
       Produit: row.name,
-      [`Quantité (${businessConfig.unit.basePluralLower})`]: row.quantity,
+      [`Quantité (${branding.unitBasePluralLower})`]: row.quantity,
       [revenueLabel]: row.revenue,
       [`Marge (${branding.currency})`]: row.margin,
     })),

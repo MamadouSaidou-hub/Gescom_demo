@@ -36,7 +36,7 @@ function RankBar({ label, value, formatted, max, color, sub }: { label: string; 
 }
 
 export function ReportsView() {
-  const { companyShortName, currency } = useSettings()
+  const { companyShortName, currency, unitBasePlural, unitBasePluralLower } = useSettings()
   const [period, setPeriod] = useState(periods[2])
   const [data, setData] = useState<ReportsData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -75,8 +75,8 @@ export function ReportsView() {
         <div className="filter-row">
           <label className="select-wrap"><span className="sr-only">Période</span><select value={period} onChange={(event) => setPeriod(event.target.value)}>{periods.map((item) => <option key={item}>{item}</option>)}</select><ChevronDown /></label>
           <div className="export-group">
-            <button className="btn-secondary" disabled={!data} onClick={() => data && exportReportPdf(data, period, { companyShortName, currency })}><Download size={13} /> PDF</button>
-            <button className="btn-secondary" disabled={!data} onClick={() => data && exportReportExcel(data, period, { companyShortName, currency })}><FileSpreadsheet size={13} /> Excel</button>
+            <button className="btn-secondary" disabled={!data} onClick={() => data && exportReportPdf(data, period, { companyShortName, currency, unitBasePlural, unitBasePluralLower })}><Download size={13} /> PDF</button>
+            <button className="btn-secondary" disabled={!data} onClick={() => data && exportReportExcel(data, period, { companyShortName, currency, unitBasePlural, unitBasePluralLower })}><FileSpreadsheet size={13} /> Excel</button>
           </div>
         </div>
       </section>

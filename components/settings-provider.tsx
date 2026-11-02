@@ -2,7 +2,24 @@
 
 import { createContext, useContext, type ReactNode } from 'react'
 
-export type AppSettings = { companyName: string; companyShortName: string; country: string; currency: string; address: string; phone: string; email: string; logoVersion: string }
+export type AppSettings = {
+  companyName: string
+  companyShortName: string
+  country: string
+  currency: string
+  address: string
+  phone: string
+  email: string
+  logoVersion: string
+  unitBaseSingular: string
+  unitBasePlural: string
+  unitBaseSingularLower: string
+  unitBasePluralLower: string
+  unitBulkSingular: string
+  unitBulkPlural: string
+  unitConversionMode: 'weight' | 'count'
+  unitBulkConversionFactor: number
+}
 
 const SettingsContext = createContext<AppSettings | null>(null)
 

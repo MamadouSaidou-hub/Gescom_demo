@@ -8,7 +8,6 @@ import { downloadCsv } from '@/lib/download-csv'
 import { fetchJson } from '@/lib/fetch-json'
 import { Modal } from '@/components/modal'
 import { LoadError } from '@/components/load-error'
-import { businessConfig } from '@/lib/business-config'
 import { useSettings } from '@/components/settings-provider'
 
 type StockItem = {
@@ -74,7 +73,7 @@ function MetricCard({ label, value, icon: Icon, tone }: { label: string; value: 
 }
 
 function NewProductForm({ storeOptions, onCreated }: { storeOptions: StoreOption[]; onCreated: () => void }) {
-  const { currency } = useSettings()
+  const { currency, unitBaseSingularLower, unitBasePluralLower, unitBulkSingular, unitConversionMode } = useSettings()
   const [name, setName] = useState('')
   const [sku, setSku] = useState('')
   const [customSku, setCustomSku] = useState(false)
@@ -143,8 +142,12 @@ function NewProductForm({ storeOptions, onCreated }: { storeOptions: StoreOption
         <div className="form-field"><label>Quantité initiale</label><input required type="number" min="0" value={initialQuantity} onChange={(event) => setInitialQuantity(event.target.value)} /></div>
       </div>
       <div className="form-field">
-        <label>Poids du {businessConfig.unit.baseSingularLower} (kg, optionnel)</label>
-        <input type="number" min="0" step="0.1" placeholder="Ex : 25" value={sackWeightKg} onChange={(event) => setSackWeightKg(event.target.value)} />
+        <label>
+          {unitConversionMode === 'count'
+            ? `Nombre de ${unitBasePluralLower} par ${unitBulkSingular.toLowerCase()} (optionnel)`
+            : `Poids du ${unitBaseSingularLower} (kg, optionnel)`}
+        </label>
+        <input type="number" min="0" step="0.1" placeholder={unitConversionMode === 'count' ? 'Ex : 12' : 'Ex : 25'} value={sackWeightKg} onChange={(event) => setSackWeightKg(event.target.value)} />
       </div>
       <div className="form-field">
         <label>Magasin de départ</label>

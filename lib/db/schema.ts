@@ -87,6 +87,20 @@ export const appSettings = pgTable(
     companyPhone: text('company_phone'),
     companyEmail: text('company_email'),
     logoDataUrl: text('logo_data_url'),
+    // Unit-of-measure vocabulary + conversion, per tenant — all nullable, falling back to
+    // businessConfig.unit's static defaults (Sac/Tonne/weight/1000) in lib/settings-cache.ts until a
+    // tenant customizes them, so this is a zero-behavior-change addition for every existing tenant.
+    // 'weight' mode: products.sackWeightKg means "kg per base unit", bulk quantity entered gets
+    // divided by it after converting via unitBulkConversionFactor (kg per bulk unit) — e.g. tonnage
+    // of flour -> sack count. 'count' mode: sackWeightKg instead means "base units per bulk unit"
+    // directly (no weight involved) and the bulk quantity gets MULTIPLIED by it instead — e.g.
+    // cartons of soap -> piece count. Same per-product column, different meaning depending on mode.
+    unitBaseSingular: text('unit_base_singular'),
+    unitBasePlural: text('unit_base_plural'),
+    unitBulkSingular: text('unit_bulk_singular'),
+    unitBulkPlural: text('unit_bulk_plural'),
+    unitConversionMode: text('unit_conversion_mode', { enum: ['weight', 'count'] }),
+    unitBulkConversionFactor: doublePrecision('unit_bulk_conversion_factor'),
   },
   (table) => [uniqueIndex('app_settings_tenant_id_unique').on(table.tenantId)],
 )

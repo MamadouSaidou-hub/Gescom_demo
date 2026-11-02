@@ -5,7 +5,6 @@ import { Plus, Trash2 } from 'lucide-react'
 import { Modal } from '@/components/modal'
 import { LoadError } from '@/components/load-error'
 import { fetchJson } from '@/lib/fetch-json'
-import { businessConfig } from '@/lib/business-config'
 import { useSettings } from '@/components/settings-provider'
 
 type Tier = { id?: number; thresholdSacks: string; discountPerSack: string }
@@ -34,7 +33,7 @@ export function DiscountScaleModal({
   partyId: number
   partyName: string
 }) {
-  const { currency } = useSettings()
+  const { currency, unitBasePlural, unitBasePluralLower, unitBaseSingularLower } = useSettings()
   const [data, setData] = useState<ScaleData | null>(null)
   const [tiers, setTiers] = useState<Tier[]>([])
   const [loading, setLoading] = useState(true)
@@ -126,8 +125,8 @@ export function DiscountScaleModal({
       title={`Barème de remise — ${partyName}`}
       subtitle={
         partyType === 'supplier'
-          ? `Palier de ${businessConfig.unit.basePluralLower} répété (sans limite de temps) et remise par ${businessConfig.unit.baseSingularLower}.`
-          : `Paliers de ${businessConfig.unit.basePluralLower} mensuels et remise par ${businessConfig.unit.baseSingularLower}.`
+          ? `Palier de ${unitBasePluralLower} répété (sans limite de temps) et remise par ${unitBaseSingularLower}.`
+          : `Paliers de ${unitBasePluralLower} mensuels et remise par ${unitBaseSingularLower}.`
       }
       wide
     >
@@ -140,23 +139,23 @@ export function DiscountScaleModal({
 
           {partyType === 'client' ? (
             <p className="section-subtitle">
-              {businessConfig.unit.basePlural} ce mois : <strong>{data.current.sackCount}</strong>
+              {unitBasePlural} ce mois : <strong>{data.current.sackCount}</strong>
               {' · '}Palier atteint : <strong>{data.current.tierReached ?? '—'}</strong>
               {' · '}Ristourne du mois : <strong>{data.current.totalDiscountFormatted}</strong>
-              {data.current.nextTier && <> {' · '}Prochain palier dans <strong>{data.current.nextTier.sacksRemaining} {businessConfig.unit.basePluralLower}</strong></>}
+              {data.current.nextTier && <> {' · '}Prochain palier dans <strong>{data.current.nextTier.sacksRemaining} {unitBasePluralLower}</strong></>}
             </p>
           ) : (
             <p className="section-subtitle">
-              {businessConfig.unit.basePlural} depuis le dernier palier : <strong>{data.current.sackCount}</strong>
-              {data.current.nextTier && <> {' · '}Prochain palier dans <strong>{data.current.nextTier.sacksRemaining} {businessConfig.unit.basePluralLower}</strong></>}
+              {unitBasePlural} depuis le dernier palier : <strong>{data.current.sackCount}</strong>
+              {data.current.nextTier && <> {' · '}Prochain palier dans <strong>{data.current.nextTier.sacksRemaining} {unitBasePluralLower}</strong></>}
             </p>
           )}
 
           <label style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', display: 'block', marginBottom: 6 }}>Paliers</label>
           {tiers.map((tier, index) => (
             <div className="item-row-grid" style={{ gridTemplateColumns: '1fr 1fr auto' }} key={index}>
-              <div className="form-field" style={{ marginBottom: 0 }}><input required type="number" min="1" placeholder={`Seuil (${businessConfig.unit.basePluralLower})`} value={tier.thresholdSacks} onChange={(event) => updateTier(index, { thresholdSacks: event.target.value })} /></div>
-              <div className="form-field" style={{ marginBottom: 0 }}><input required type="number" min="0" placeholder={`Remise/${businessConfig.unit.baseSingularLower} (${currency})`} value={tier.discountPerSack} onChange={(event) => updateTier(index, { discountPerSack: event.target.value })} /></div>
+              <div className="form-field" style={{ marginBottom: 0 }}><input required type="number" min="1" placeholder={`Seuil (${unitBasePluralLower})`} value={tier.thresholdSacks} onChange={(event) => updateTier(index, { thresholdSacks: event.target.value })} /></div>
+              <div className="form-field" style={{ marginBottom: 0 }}><input required type="number" min="0" placeholder={`Remise/${unitBaseSingularLower} (${currency})`} value={tier.discountPerSack} onChange={(event) => updateTier(index, { discountPerSack: event.target.value })} /></div>
               <button type="button" className="item-row-remove" onClick={() => removeTier(index)} aria-label="Retirer le palier"><Trash2 size={14} /></button>
             </div>
           ))}
@@ -173,12 +172,12 @@ export function DiscountScaleModal({
             <>
               <label style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', display: 'block', margin: '16px 0 6px' }}>Historique</label>
               <table className="data-table">
-                <thead><tr><th>{partyType === 'client' ? 'Période' : 'Date du palier'}</th><th>{businessConfig.unit.basePlural}</th><th>Palier</th><th>Ristourne</th></tr></thead>
+                <thead><tr><th>{partyType === 'client' ? 'Période' : 'Date du palier'}</th><th>{unitBasePlural}</th><th>Palier</th><th>Ristourne</th></tr></thead>
                 <tbody>
                   {data.history.map((row) => (
                     <tr key={row.period}>
                       <td data-label="Période">{formatPeriod(row.period)}</td>
-                      <td data-label={businessConfig.unit.basePlural}>{row.sackCount}</td>
+                      <td data-label={unitBasePlural}>{row.sackCount}</td>
                       <td data-label="Palier">{row.tierReached ?? '—'}</td>
                       <td data-label="Ristourne">{row.totalDiscountFormatted}</td>
                     </tr>
