@@ -8,6 +8,7 @@ import { getDefaultBranding, getTenantBranding } from '@/lib/settings-cache'
 import { companyInfo } from '@/lib/company-info'
 import { getSessionState } from '@/lib/session'
 import { SettingsProvider } from '@/components/settings-provider'
+import { PwaUpdateWatcher } from '@/components/pwa-update-watcher'
 
 // Resolves branding fresh for *this* request — never a shared mutable global — so concurrent
 // requests from different tenants on the same server instance can never see each other's
@@ -114,6 +115,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body className="antialiased">
+        <PwaUpdateWatcher />
         <SettingsProvider value={settings}>{children}</SettingsProvider>
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
