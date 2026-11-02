@@ -2,7 +2,6 @@ import { and, eq, sql } from 'drizzle-orm'
 import { withTenant } from '../tenant'
 import { payments, paymentMethod, products, receivables, saleItems, sales, stockLevels, stockMovements } from '../schema'
 import { getQuantity } from './shared'
-import { getTenantBranding } from '@/lib/settings-cache'
 import { recordAutoCashMovement } from './cash-accounts'
 
 export async function createSale(
@@ -14,14 +13,13 @@ export async function createSale(
     paidNow: number
     method?: (typeof paymentMethod)[number]
     dueInDays: number
-    items: { productId: number; quantity: number; unit?: 'sack' | 'tonne'; tonnage?: number }[]
+    items: { productId: number; quantity: number }[]
   },
 ) {
   if (input.items.length === 0) {
     throw new Error('Une vente doit contenir au moins un article.')
   }
   const method = input.method ?? 'cash'
-  const branding = await getTenantBranding(tenantId)
 
   const sale = await withTenant(tenantId, async (tx) => {
     const productRows = await tx.select().from(products).where(eq(products.tenantId, tenantId))
@@ -34,26 +32,7 @@ export async function createSale(
       }
       // The sale price always comes from the product catalog, never from client input — a seller
       // cannot under- or over-charge by tampering with the request.
-      const unitPrice = product.unitPrice
-
-      if (item.unit === 'tonne') {
-        if (!product.sackWeightKg) {
-          const configField = branding.unitConversionMode === 'count' ? `nombre de ${branding.unitBasePluralLower} par ${branding.unitBulkSingular.toLowerCase()}` : `poids de ${branding.unitBaseSingularLower}`
-          throw new Error(`Ce produit n'a pas de ${configField} configuré, vente en ${branding.unitBulkPlural.toLowerCase()} impossible.`)
-        }
-        const tonnage = item.tonnage ?? 0
-        // 'count' mode: sackWeightKg holds "base units per bulk unit" directly (e.g. pieces per
-        // carton) — multiply. 'weight' mode: it holds a weight, and the bulk amount is converted
-        // through unitBulkConversionFactor (e.g. kg per tonne) before dividing — same formula
-        // already fixed once for BILMS's count-based case, now generalized per tenant here instead
-        // of hardcoded to one mode.
-        const quantity =
-          branding.unitConversionMode === 'count'
-            ? Math.round(tonnage * product.sackWeightKg)
-            : Math.round((tonnage * branding.unitBulkConversionFactor) / product.sackWeightKg)
-        return { ...item, quantity, unitPrice, unit: 'tonne' as const, tonnage }
-      }
-      return { ...item, unitPrice, unit: 'sack' as const, tonnage: null }
+      return { ...item, unitPrice: product.unitPrice }
     })
 
     for (const item of items) {
@@ -96,8 +75,6 @@ export async function createSale(
         productId: item.productId,
         quantity: item.quantity,
         unitPrice: item.unitPrice,
-        unit: item.unit,
-        tonnage: item.tonnage,
         tenantId,
       })),
     )

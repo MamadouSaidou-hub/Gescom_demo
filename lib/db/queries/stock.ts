@@ -25,6 +25,8 @@ export async function getStockOverview(tenantId: number, storeName: string | nul
         threshold: products.reorderThreshold,
         quantity: stockLevels.quantity,
         storeName: stores.name,
+        unitSingular: products.unitSingular,
+        unitPlural: products.unitPlural,
       })
       .from(stockLevels)
       .innerJoin(products, eq(stockLevels.productId, products.id))
@@ -78,6 +80,8 @@ export async function getStockOverview(tenantId: number, storeName: string | nul
         unitPrice: string
         unitPriceRaw: number
         costPriceRaw: number
+        unitSingular: string
+        unitPlural: string
         totalQuantity: number
         status: 'critical' | 'low' | 'ok'
         stores: { store: string; quantity: number; threshold: number; status: 'critical' | 'low' | 'ok' }[]
@@ -103,6 +107,8 @@ export async function getStockOverview(tenantId: number, storeName: string | nul
           unitPrice: formatFcfa(row.unitPrice),
           unitPriceRaw: row.unitPrice,
           costPriceRaw: row.costPrice,
+          unitSingular: row.unitSingular,
+          unitPlural: row.unitPlural,
           totalQuantity: 0,
           status: 'ok',
           stores: [],

@@ -15,10 +15,6 @@ export type AppSettings = {
   unitBasePlural: string
   unitBaseSingularLower: string
   unitBasePluralLower: string
-  unitBulkSingular: string
-  unitBulkPlural: string
-  unitConversionMode: 'weight' | 'count'
-  unitBulkConversionFactor: number
 }
 
 const SettingsContext = createContext<AppSettings | null>(null)

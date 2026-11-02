@@ -22,10 +22,6 @@ export async function updateAppSettings(
     logoDataUrl?: string | null
     unitBaseSingular?: string | null
     unitBasePlural?: string | null
-    unitBulkSingular?: string | null
-    unitBulkPlural?: string | null
-    unitConversionMode?: 'weight' | 'count' | null
-    unitBulkConversionFactor?: number | null
   },
 ) {
   return withTenant(tenantId, async (tx) => {

@@ -102,10 +102,6 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
     unitBasePlural: branding.unitBasePlural,
     unitBaseSingularLower: branding.unitBaseSingularLower,
     unitBasePluralLower: branding.unitBasePluralLower,
-    unitBulkSingular: branding.unitBulkSingular,
-    unitBulkPlural: branding.unitBulkPlural,
-    unitConversionMode: branding.unitConversionMode,
-    unitBulkConversionFactor: branding.unitBulkConversionFactor,
   }
 
   return (

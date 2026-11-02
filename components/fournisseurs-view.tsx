@@ -27,7 +27,7 @@ type SuppliersData = {
 }
 
 type StoreOption = { id: number; name: string }
-type ProductOption = { id: number; name: string; sku: string }
+type ProductOption = { id: number; name: string; sku: string; unitSingular: string; unitPlural: string }
 
 const statusLabel = { ok: 'À jour', pending: 'En cours', overdue: 'En retard' }
 const statusBadge = { ok: 'badge-green', pending: 'badge-blue', overdue: 'badge-red' }
@@ -92,7 +92,7 @@ function RecordDeliveryForm({
   productOptions: ProductOption[]
   onCreated: () => void
 }) {
-  const { unitBasePluralLower, unitBulkSingular } = useSettings()
+  const { unitBasePluralLower } = useSettings()
   const [storeId, setStoreId] = useState('')
   const [productId, setProductId] = useState('')
   const [sackCount, setSackCount] = useState('')
@@ -159,8 +159,11 @@ function RecordDeliveryForm({
         </div>
       </div>
       <div className="form-row">
-        <div className="form-field"><label>Nombre de {unitBasePluralLower}</label><input required type="number" min="1" value={sackCount} onChange={(event) => setSackCount(event.target.value)} /></div>
-        <div className="form-field"><label>{unitBulkSingular} (optionnel)</label><input type="number" min="0" step="0.01" value={tonnage} onChange={(event) => setTonnage(event.target.value)} placeholder="Pour info uniquement" /></div>
+        <div className="form-field">
+          <label>Nombre de {(productOptions.find((option) => String(option.id) === productId)?.unitPlural ?? unitBasePluralLower).toLowerCase()}</label>
+          <input required type="number" min="1" value={sackCount} onChange={(event) => setSackCount(event.target.value)} />
+        </div>
+        <div className="form-field"><label>Information complémentaire (optionnel)</label><input type="number" min="0" step="0.01" value={tonnage} onChange={(event) => setTonnage(event.target.value)} placeholder="Ex : poids total" /></div>
       </div>
       <div className="form-field"><label>Référence bon de livraison (optionnel)</label><input value={reference} onChange={(event) => setReference(event.target.value)} placeholder="Ex : plaque du camion" /></div>
 

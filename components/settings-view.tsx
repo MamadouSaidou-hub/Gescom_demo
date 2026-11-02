@@ -19,10 +19,6 @@ type AppSettings = {
   logoDataUrl: string | null
   unitBaseSingular: string | null
   unitBasePlural: string | null
-  unitBulkSingular: string | null
-  unitBulkPlural: string | null
-  unitConversionMode: 'weight' | 'count' | null
-  unitBulkConversionFactor: number | null
 }
 
 const MAX_LOGO_DIMENSION = 320
@@ -199,9 +195,9 @@ export function SettingsView() {
               </div>
             </div>
             <div className="form-field" style={{ marginTop: 10, paddingTop: 16, borderTop: '1px solid var(--border, #e3e9f1)' }}>
-              <label style={{ fontWeight: 700 }}>Unités de mesure</label>
+              <label style={{ fontWeight: 700 }}>Unité par défaut</label>
               <p className="section-subtitle" style={{ marginTop: 2 }}>
-                Comment un produit se vend à l’unité (ex : "Pièce") et en gros (ex : "Carton"). Laissez vide pour garder les valeurs par défaut ("Sac"/"Tonne").
+                Valeur pré-remplie à la création d’un nouvel article — chaque produit garde ensuite sa propre unité (ex : "Bouteille" pour l’eau, "Sac" pour la farine), modifiable à sa création.
               </p>
             </div>
             <div className="form-row">
@@ -214,32 +210,6 @@ export function SettingsView() {
                 <input value={form.unitBasePlural ?? ''} onChange={(event) => setForm({ ...form, unitBasePlural: event.target.value || null })} placeholder="Ex : Sacs, Pièces, Kg" />
               </div>
             </div>
-            <div className="form-row">
-              <div className="form-field">
-                <label>Unité groupée — singulier</label>
-                <input value={form.unitBulkSingular ?? ''} onChange={(event) => setForm({ ...form, unitBulkSingular: event.target.value || null })} placeholder="Ex : Tonne, Carton" />
-              </div>
-              <div className="form-field">
-                <label>Unité groupée — pluriel</label>
-                <input value={form.unitBulkPlural ?? ''} onChange={(event) => setForm({ ...form, unitBulkPlural: event.target.value || null })} placeholder="Ex : Tonnes, Cartons" />
-              </div>
-            </div>
-            <div className="form-field">
-              <label>Mode de conversion</label>
-              <select value={form.unitConversionMode ?? 'weight'} onChange={(event) => setForm({ ...form, unitConversionMode: event.target.value as 'weight' | 'count' })}>
-                <option value="weight">Par poids — ex : tonnage ÷ poids d’un sac = nombre de sacs</option>
-                <option value="count">Par comptage — ex : nombre de cartons × pièces par carton = nombre de pièces</option>
-              </select>
-              <p className="section-subtitle" style={{ marginTop: 4 }}>
-                Le champ "poids du {(form.unitBaseSingular ?? 'sac').toLowerCase()}" sur chaque produit change de sens selon le mode : un poids (kg) en mode "par poids", ou un nombre d’unités de base par unité groupée en mode "par comptage".
-              </p>
-            </div>
-            {(form.unitConversionMode ?? 'weight') === 'weight' && (
-              <div className="form-field">
-                <label>Facteur de conversion (ex : 1000 pour kg par tonne)</label>
-                <input type="number" min="0.000001" step="any" value={form.unitBulkConversionFactor ?? ''} onChange={(event) => setForm({ ...form, unitBulkConversionFactor: event.target.value ? Number(event.target.value) : null })} placeholder="Ex : 1000" />
-              </div>
-            )}
 
             <div className="form-actions">
               <button type="submit" className="btn-primary" disabled={saving}>

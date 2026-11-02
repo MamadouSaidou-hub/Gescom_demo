@@ -77,6 +77,8 @@ export async function getSaleDetail(tenantId: number, reference: string) {
         sku: products.sku,
         quantity: saleItems.quantity,
         unitPrice: saleItems.unitPrice,
+        unitSingular: products.unitSingular,
+        unitPlural: products.unitPlural,
       })
       .from(saleItems)
       .innerJoin(products, eq(saleItems.productId, products.id))
@@ -102,6 +104,7 @@ export async function getSaleDetail(tenantId: number, reference: string) {
         productName: item.productName,
         sku: item.sku,
         quantity: item.quantity,
+        unitLabel: item.quantity === 1 ? item.unitSingular : item.unitPlural,
         unitPrice: item.unitPrice,
         unitPriceFormatted: formatFcfa(item.unitPrice),
         lineTotalFormatted: formatFcfa(item.quantity * item.unitPrice),

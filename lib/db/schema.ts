@@ -87,20 +87,13 @@ export const appSettings = pgTable(
     companyPhone: text('company_phone'),
     companyEmail: text('company_email'),
     logoDataUrl: text('logo_data_url'),
-    // Unit-of-measure vocabulary + conversion, per tenant — all nullable, falling back to
-    // businessConfig.unit's static defaults (Sac/Tonne/weight/1000) in lib/settings-cache.ts until a
-    // tenant customizes them, so this is a zero-behavior-change addition for every existing tenant.
-    // 'weight' mode: products.sackWeightKg means "kg per base unit", bulk quantity entered gets
-    // divided by it after converting via unitBulkConversionFactor (kg per bulk unit) — e.g. tonnage
-    // of flour -> sack count. 'count' mode: sackWeightKg instead means "base units per bulk unit"
-    // directly (no weight involved) and the bulk quantity gets MULTIPLIED by it instead — e.g.
-    // cartons of soap -> piece count. Same per-product column, different meaning depending on mode.
+    // Default unit label pre-filled when creating a new product, and the generic label used by
+    // features that aggregate quantities across many products (discount tiers, monthly supplier
+    // totals). Each product's own display unit lives on products.unitSingular/unitPlural instead —
+    // see that column's comment. Nullable, falling back to businessConfig.unit's static defaults in
+    // lib/settings-cache.ts until a tenant customizes them.
     unitBaseSingular: text('unit_base_singular'),
     unitBasePlural: text('unit_base_plural'),
-    unitBulkSingular: text('unit_bulk_singular'),
-    unitBulkPlural: text('unit_bulk_plural'),
-    unitConversionMode: text('unit_conversion_mode', { enum: ['weight', 'count'] }),
-    unitBulkConversionFactor: doublePrecision('unit_bulk_conversion_factor'),
   },
   (table) => [uniqueIndex('app_settings_tenant_id_unique').on(table.tenantId)],
 )
@@ -118,9 +111,14 @@ export const products = pgTable(
     unitPrice: doublePrecision('unit_price').notNull(),
     costPrice: doublePrecision('cost_price').notNull(),
     reorderThreshold: integer('reorder_threshold').notNull().default(10),
-    // Weight of one sack, in kg — lets a sale be entered in tonnes and converted to a sack count.
-    // Null means this product can only be sold by sack count directly.
+    // Deprecated — superseded by unitSingular/unitPlural below. No longer read or written; kept so
+    // historical per-product weight values already entered aren't silently dropped.
     sackWeightKg: doublePrecision('sack_weight_kg'),
+    // How this specific product is counted — e.g. "Bouteille"/"Bouteilles" for water, "Sac"/"Sacs"
+    // for flour. Each product has its own, unlike the tenant-wide default in appSettings (which is
+    // only a prefill for new products and a label for cross-product aggregates like discount tiers).
+    unitSingular: text('unit_singular').notNull().default('Sac'),
+    unitPlural: text('unit_plural').notNull().default('Sacs'),
     ...timestamps,
   },
   (table) => [uniqueIndex('products_tenant_sku_unique').on(table.tenantId, table.sku), index('products_tenant_id_idx').on(table.tenantId)],
@@ -260,10 +258,10 @@ export const saleItems = pgTable(
     productId: integer('product_id')
       .notNull()
       .references(() => products.id, { onDelete: 'restrict' }),
-    // Always the sack count, however the sale was entered — everything downstream (stock, discount
-    // cycles) reads this. `unit`/`tonnage` below are purely what the seller typed, for display/audit.
     quantity: integer('quantity').notNull(),
     unitPrice: doublePrecision('unit_price').notNull(),
+    // Deprecated — a removed bulk-sale conversion feature used to let a seller type a tonnage/unit
+    // instead of a plain quantity. No longer read or written; kept so historical rows aren't lost.
     unit: text('unit', { enum: saleItemUnit }).notNull().default('sack'),
     tonnage: doublePrecision('tonnage'),
   },

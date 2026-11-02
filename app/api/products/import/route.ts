@@ -55,15 +55,23 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Le fichier ne contient aucune ligne de produit.' }, { status: 400 })
   }
 
-  const rows: BulkImportRow[] = rawRows.map((raw) => ({
-    sku: pick(raw, 'code-barres', 'code barres', 'sku') || undefined,
-    name: pick(raw, 'nom', 'nom du produit', 'produit'),
-    category: pick(raw, 'catégorie', 'categorie'),
-    unitPrice: toNumber(pick(raw, 'prix de vente', 'prix vente')),
-    costPrice: toNumber(pick(raw, "prix d'achat", 'prix dachat', 'prix achat')),
-    initialQuantity: pick(raw, 'stock initial', 'stock') ? toNumber(pick(raw, 'stock initial', 'stock')) : undefined,
-    reorderThreshold: pick(raw, "seuil d'alerte", 'seuil dalerte', 'seuil') ? toNumber(pick(raw, "seuil d'alerte", 'seuil dalerte', 'seuil')) : undefined,
-  }))
+  const rows: BulkImportRow[] = rawRows.map((raw) => {
+    const unitSingular = pick(raw, 'unité', 'unite', 'unité de mesure', 'unite de mesure') || undefined
+    const unitPluralRaw = pick(raw, 'unité pluriel', 'unite pluriel', 'unité (pluriel)') || undefined
+    return {
+      sku: pick(raw, 'code-barres', 'code barres', 'sku') || undefined,
+      name: pick(raw, 'nom', 'nom du produit', 'produit'),
+      category: pick(raw, 'catégorie', 'categorie'),
+      unitPrice: toNumber(pick(raw, 'prix de vente', 'prix vente')),
+      costPrice: toNumber(pick(raw, "prix d'achat", 'prix dachat', 'prix achat')),
+      initialQuantity: pick(raw, 'stock initial', 'stock') ? toNumber(pick(raw, 'stock initial', 'stock')) : undefined,
+      reorderThreshold: pick(raw, "seuil d'alerte", 'seuil dalerte', 'seuil') ? toNumber(pick(raw, "seuil d'alerte", 'seuil dalerte', 'seuil')) : undefined,
+      unitSingular,
+      // No explicit plural column given: a simple "+s" is a reasonable default for most French
+      // nouns ("Bouteille" -> "Bouteilles") and the admin can always override it later.
+      unitPlural: unitPluralRaw ?? (unitSingular ? (unitSingular.endsWith('s') ? unitSingular : `${unitSingular}s`) : undefined),
+    }
+  })
 
   try {
     const result = await bulkImportProducts(ctx.tenantId, { storeId, rows })

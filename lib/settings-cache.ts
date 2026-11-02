@@ -35,10 +35,6 @@ export type TenantBranding = {
   unitBasePlural: string
   unitBaseSingularLower: string
   unitBasePluralLower: string
-  unitBulkSingular: string
-  unitBulkPlural: string
-  unitConversionMode: 'weight' | 'count'
-  unitBulkConversionFactor: number
 }
 
 type LoadedSettings = {
@@ -52,10 +48,6 @@ type LoadedSettings = {
   logoDataUrl?: string | null
   unitBaseSingular?: string | null
   unitBasePlural?: string | null
-  unitBulkSingular?: string | null
-  unitBulkPlural?: string | null
-  unitConversionMode?: string | null
-  unitBulkConversionFactor?: number | null
 }
 
 const DEFAULT_BRANDING: TenantBranding = {
@@ -72,18 +64,12 @@ const DEFAULT_BRANDING: TenantBranding = {
   unitBasePlural: businessConfig.unit.basePlural,
   unitBaseSingularLower: businessConfig.unit.baseSingularLower,
   unitBasePluralLower: businessConfig.unit.basePluralLower,
-  unitBulkSingular: businessConfig.unit.bulkLabel,
-  unitBulkPlural: `${businessConfig.unit.bulkLabel}s`,
-  unitConversionMode: 'weight',
-  unitBulkConversionFactor: businessConfig.unit.bulkConversionFactor,
 }
 
 function resolve(settings: LoadedSettings): TenantBranding {
   const logoPath = settings.logoDataUrl || DEFAULT_BRANDING.logoPath
   const unitBaseSingular = settings.unitBaseSingular || DEFAULT_BRANDING.unitBaseSingular
   const unitBasePlural = settings.unitBasePlural || DEFAULT_BRANDING.unitBasePlural
-  const unitBulkSingular = settings.unitBulkSingular || DEFAULT_BRANDING.unitBulkSingular
-  const unitBulkPlural = settings.unitBulkPlural || DEFAULT_BRANDING.unitBulkPlural
   return {
     companyName: settings.companyName,
     companyShortName: settings.companyShortName,
@@ -98,10 +84,6 @@ function resolve(settings: LoadedSettings): TenantBranding {
     unitBasePlural,
     unitBaseSingularLower: unitBaseSingular.toLowerCase(),
     unitBasePluralLower: unitBasePlural.toLowerCase(),
-    unitBulkSingular,
-    unitBulkPlural,
-    unitConversionMode: settings.unitConversionMode === 'count' ? 'count' : 'weight',
-    unitBulkConversionFactor: settings.unitBulkConversionFactor || DEFAULT_BRANDING.unitBulkConversionFactor,
   }
 }
 

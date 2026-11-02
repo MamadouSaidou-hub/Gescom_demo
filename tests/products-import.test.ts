@@ -107,4 +107,27 @@ describe('bulkImportProducts', () => {
   it('rejects an import targeting a store outside the tenant', async () => {
     await expect(bulkImportProducts(tenantId, { storeId: -1, rows: [{ name: 'X', category: 'Test', unitPrice: 1, costPrice: 1 }] })).rejects.toThrow(/magasin/i)
   })
+
+  it('imports a row with a custom unit, and falls back to the default unit when none is given', async () => {
+    const result = await bulkImportProducts(tenantId, {
+      storeId,
+      rows: [
+        { name: `Eau import ${runId}`, category: 'Test', unitPrice: 500, costPrice: 300, unitSingular: 'Bouteille', unitPlural: 'Bouteilles' },
+        { name: `Sans unité ${runId}`, category: 'Test', unitPrice: 1000, costPrice: 500 },
+      ],
+    })
+
+    expect(result.imported).toBe(2)
+    const rows = await withTenant(tenantId, (tx) => tx.select().from(products).where(eq(products.tenantId, tenantId)))
+    const bottle = rows.find((r) => r.name === `Eau import ${runId}`)
+    const defaultUnit = rows.find((r) => r.name === `Sans unité ${runId}`)
+    expect(bottle).toBeTruthy()
+    expect(defaultUnit).toBeTruthy()
+    productIds.push(bottle!.id, defaultUnit!.id)
+
+    expect(bottle?.unitSingular).toBe('Bouteille')
+    expect(bottle?.unitPlural).toBe('Bouteilles')
+    expect(defaultUnit?.unitSingular).toBe('Sac')
+    expect(defaultUnit?.unitPlural).toBe('Sacs')
+  })
 })

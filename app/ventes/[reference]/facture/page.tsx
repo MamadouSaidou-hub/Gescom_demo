@@ -85,7 +85,7 @@ export default async function Page({ params }: { params: Promise<{ reference: st
                 {sale.items.map((item, index) => (
                   <tr key={index} style={{ borderBottom: `1px solid ${BORDER}` }}>
                     <td style={{ padding: '10px 6px' }}>{item.productName} <span style={{ color: '#9aa8b8' }}>({item.sku})</span></td>
-                    <td style={{ textAlign: 'right', padding: '10px 6px' }}>{item.quantity}</td>
+                    <td style={{ textAlign: 'right', padding: '10px 6px' }}>{item.quantity} {item.unitLabel}</td>
                     <td style={{ textAlign: 'right', padding: '10px 6px' }}>{item.unitPriceFormatted}</td>
                     <td style={{ textAlign: 'right', padding: '10px 6px', fontWeight: 600 }}>{item.lineTotalFormatted}</td>
                   </tr>

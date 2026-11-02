@@ -15,7 +15,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
 
   const body = await request.json()
-  const input: { unitPrice?: number; costPrice?: number; reorderThreshold?: number } = {}
+  const input: { unitPrice?: number; costPrice?: number; reorderThreshold?: number; unitSingular?: string; unitPlural?: string } = {}
 
   if (body.unitPrice !== undefined) {
     const unitPrice = Number(body.unitPrice)
@@ -31,6 +31,16 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const reorderThreshold = Number(body.reorderThreshold)
     if (!Number.isFinite(reorderThreshold) || reorderThreshold < 0) return NextResponse.json({ error: 'Seuil invalide.' }, { status: 400 })
     input.reorderThreshold = reorderThreshold
+  }
+  if (body.unitSingular !== undefined) {
+    const unitSingular = String(body.unitSingular).trim()
+    if (!unitSingular) return NextResponse.json({ error: 'Unité (singulier) invalide.' }, { status: 400 })
+    input.unitSingular = unitSingular
+  }
+  if (body.unitPlural !== undefined) {
+    const unitPlural = String(body.unitPlural).trim()
+    if (!unitPlural) return NextResponse.json({ error: 'Unité (pluriel) invalide.' }, { status: 400 })
+    input.unitPlural = unitPlural
   }
 
   if (Object.keys(input).length === 0) {

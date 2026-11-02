@@ -42,6 +42,8 @@ type StockProduct = {
   unitPrice: string
   unitPriceRaw: number
   costPriceRaw: number
+  unitSingular: string
+  unitPlural: string
   totalQuantity: number
   status: 'critical' | 'low' | 'ok'
   stores: StoreBreakdown[]
@@ -73,7 +75,7 @@ function MetricCard({ label, value, icon: Icon, tone }: { label: string; value: 
 }
 
 function NewProductForm({ storeOptions, onCreated }: { storeOptions: StoreOption[]; onCreated: () => void }) {
-  const { currency, unitBaseSingularLower, unitBasePluralLower, unitBulkSingular, unitConversionMode } = useSettings()
+  const { currency, unitBaseSingular, unitBasePlural } = useSettings()
   const [name, setName] = useState('')
   const [sku, setSku] = useState('')
   const [customSku, setCustomSku] = useState(false)
@@ -83,7 +85,8 @@ function NewProductForm({ storeOptions, onCreated }: { storeOptions: StoreOption
   const [reorderThreshold, setReorderThreshold] = useState('10')
   const [storeId, setStoreId] = useState('')
   const [initialQuantity, setInitialQuantity] = useState('0')
-  const [sackWeightKg, setSackWeightKg] = useState('')
+  const [unitSingular, setUnitSingular] = useState(unitBaseSingular)
+  const [unitPlural, setUnitPlural] = useState(unitBasePlural)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
@@ -99,7 +102,7 @@ function NewProductForm({ storeOptions, onCreated }: { storeOptions: StoreOption
       const res = await fetch('/api/products', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, sku, category, unitPrice, costPrice, reorderThreshold, storeId, initialQuantity, sackWeightKg: sackWeightKg || null }),
+        body: JSON.stringify({ name, sku, category, unitPrice, costPrice, reorderThreshold, storeId, initialQuantity, unitSingular, unitPlural }),
       })
       const json = await res.json()
       if (!res.ok) {
@@ -141,13 +144,15 @@ function NewProductForm({ storeOptions, onCreated }: { storeOptions: StoreOption
         <div className="form-field"><label>Seuil d’alerte</label><input required type="number" min="0" value={reorderThreshold} onChange={(event) => setReorderThreshold(event.target.value)} /></div>
         <div className="form-field"><label>Quantité initiale</label><input required type="number" min="0" value={initialQuantity} onChange={(event) => setInitialQuantity(event.target.value)} /></div>
       </div>
-      <div className="form-field">
-        <label>
-          {unitConversionMode === 'count'
-            ? `Nombre de ${unitBasePluralLower} par ${unitBulkSingular.toLowerCase()} (optionnel)`
-            : `Poids du ${unitBaseSingularLower} (kg, optionnel)`}
-        </label>
-        <input type="number" min="0" step="0.1" placeholder={unitConversionMode === 'count' ? 'Ex : 12' : 'Ex : 25'} value={sackWeightKg} onChange={(event) => setSackWeightKg(event.target.value)} />
+      <div className="form-row">
+        <div className="form-field">
+          <label>Unité (singulier)</label>
+          <input required value={unitSingular} onChange={(event) => setUnitSingular(event.target.value)} placeholder="Ex : Bouteille, Carton, Pièce" />
+        </div>
+        <div className="form-field">
+          <label>Unité (pluriel)</label>
+          <input required value={unitPlural} onChange={(event) => setUnitPlural(event.target.value)} placeholder="Ex : Bouteilles, Cartons, Pièces" />
+        </div>
       </div>
       <div className="form-field">
         <label>Magasin de départ</label>
@@ -204,7 +209,8 @@ function ImportProductsForm({ storeOptions, onImported }: { storeOptions: StoreO
       {error && <p className="form-error">{error}</p>}
       <p className="section-subtitle">
         Fichier .csv ou .xlsx avec les colonnes : <strong>Code-barres</strong> (optionnel), <strong>Nom</strong>, <strong>Catégorie</strong>,{' '}
-        <strong>Prix d’achat</strong>, <strong>Prix de vente</strong>, <strong>Stock initial</strong> (optionnel), <strong>Seuil d’alerte</strong> (optionnel).
+        <strong>Prix d’achat</strong>, <strong>Prix de vente</strong>, <strong>Stock initial</strong> (optionnel), <strong>Seuil d’alerte</strong> (optionnel),{' '}
+        <strong>Unité</strong> (optionnel, ex : Bouteille, Carton, Pièce — par défaut "Sac").
       </p>
       <div className="form-field">
         <label>Magasin cible (pour le stock initial)</label>
@@ -239,6 +245,8 @@ function EditPriceForm({ item, onSaved }: { item: StockProduct; onSaved: () => v
   const { currency } = useSettings()
   const [unitPrice, setUnitPrice] = useState(String(item.unitPriceRaw))
   const [costPrice, setCostPrice] = useState(String(item.costPriceRaw))
+  const [unitSingular, setUnitSingular] = useState(item.unitSingular)
+  const [unitPlural, setUnitPlural] = useState(item.unitPlural)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
@@ -250,7 +258,7 @@ function EditPriceForm({ item, onSaved }: { item: StockProduct; onSaved: () => v
       const res = await fetch(`/api/products/${item.productId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ unitPrice, costPrice }),
+        body: JSON.stringify({ unitPrice, costPrice, unitSingular, unitPlural }),
       })
       const json = await res.json()
       if (!res.ok) {
@@ -274,6 +282,11 @@ function EditPriceForm({ item, onSaved }: { item: StockProduct; onSaved: () => v
         <div className="form-field"><label>Prix de revient ({currency})</label><input required type="number" min="0" value={costPrice} onChange={(event) => setCostPrice(event.target.value)} /></div>
       </div>
       <p className="section-subtitle">Le nouveau prix de revient s’applique aux prochaines ventes. Les ventes déjà enregistrées gardent leur marge d’origine.</p>
+      <p className="section-title" style={{ marginBottom: 8, marginTop: 16 }}>Unité</p>
+      <div className="form-row">
+        <div className="form-field"><label>Singulier</label><input required value={unitSingular} onChange={(event) => setUnitSingular(event.target.value)} placeholder="Ex : Bouteille" /></div>
+        <div className="form-field"><label>Pluriel</label><input required value={unitPlural} onChange={(event) => setUnitPlural(event.target.value)} placeholder="Ex : Bouteilles" /></div>
+      </div>
       <div className="form-actions"><button type="submit" className="btn-primary" disabled={submitting}>{submitting ? 'Enregistrement...' : 'Enregistrer'}</button></div>
     </form>
   )

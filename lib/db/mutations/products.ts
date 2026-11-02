@@ -58,7 +58,8 @@ export async function createProduct(
     reorderThreshold: number
     storeId: number
     initialQuantity: number
-    sackWeightKg?: number | null
+    unitSingular?: string
+    unitPlural?: string
   },
 ) {
   const sku = input.sku?.trim() || (await generateUniqueSku(tenantId, input.name))
@@ -73,7 +74,8 @@ export async function createProduct(
         unitPrice: input.unitPrice,
         costPrice: input.costPrice,
         reorderThreshold: input.reorderThreshold,
-        sackWeightKg: input.sackWeightKg ?? null,
+        ...(input.unitSingular ? { unitSingular: input.unitSingular } : {}),
+        ...(input.unitPlural ? { unitPlural: input.unitPlural } : {}),
         tenantId,
       })
       .returning()
@@ -111,6 +113,8 @@ export type BulkImportRow = {
   costPrice: number
   initialQuantity?: number
   reorderThreshold?: number
+  unitSingular?: string
+  unitPlural?: string
 }
 
 /** Imports many products in one transaction, isolating failures per row instead of letting one bad
@@ -167,6 +171,8 @@ export async function bulkImportProducts(tenantId: number, input: { storeId: num
               unitPrice: row.unitPrice,
               costPrice: row.costPrice,
               reorderThreshold: row.reorderThreshold ?? 10,
+              ...(row.unitSingular ? { unitSingular: row.unitSingular } : {}),
+              ...(row.unitPlural ? { unitPlural: row.unitPlural } : {}),
             })
             .returning()
 
@@ -204,7 +210,7 @@ export async function bulkImportProducts(tenantId: number, input: { storeId: num
 export async function updateProduct(
   tenantId: number,
   id: number,
-  input: { unitPrice?: number; costPrice?: number; reorderThreshold?: number },
+  input: { unitPrice?: number; costPrice?: number; reorderThreshold?: number; unitSingular?: string; unitPlural?: string },
 ) {
   return withTenant(tenantId, async (tx) => {
     const [product] = await tx

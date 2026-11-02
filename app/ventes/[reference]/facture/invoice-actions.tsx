@@ -18,7 +18,7 @@ type SaleDetail = {
   paymentStatus: string
   totalAmount: number
   totalAmountFormatted: string
-  items: { productName: string; sku: string; quantity: number; unitPriceFormatted: string; lineTotalFormatted: string }[]
+  items: { productName: string; sku: string; quantity: number; unitLabel: string; unitPriceFormatted: string; lineTotalFormatted: string }[]
   receivable: { amountFormatted: string; dueDate: string } | null
 }
 
@@ -94,7 +94,7 @@ async function buildInvoicePdf(sale: SaleDetail, branding: AppSettings) {
   autoTable(doc, {
     startY: afterInfo,
     head: [['Article', 'Qté', 'P.U.', 'Total']],
-    body: sale.items.map((item) => [`${item.productName} (${item.sku})`, String(item.quantity), item.unitPriceFormatted, item.lineTotalFormatted]),
+    body: sale.items.map((item) => [`${item.productName} (${item.sku})`, `${item.quantity} ${item.unitLabel}`, item.unitPriceFormatted, item.lineTotalFormatted]),
     theme: 'striped',
     headStyles: { fillColor: NAVY },
     styles: { fontSize: 9 },
