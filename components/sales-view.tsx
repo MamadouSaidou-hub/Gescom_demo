@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronDown, CreditCard, Plus, Receipt, ScanLine, Search, ShoppingCart, Trash2, WalletCards } from 'lucide-react'
 import { AppShell } from '@/components/app-shell'
 import { Modal } from '@/components/modal'
@@ -34,6 +34,32 @@ type ItemRow = { productId: string; quantity: string; unitPrice: string; unit: '
 
 const statusLabel = { paid: 'Payée', partial: 'Partielle', credit: 'Crédit' }
 const statusBadge = { paid: 'badge-green', partial: 'badge-orange', credit: 'badge-blue' }
+
+// A short beep synthesized with the Web Audio API — no audio file to ship/host, works offline.
+// Higher pitch + single beep for a recognized scan, lower pitch + double beep for an unknown one,
+// so a cashier scanning without looking at the screen can tell success from failure by ear alone.
+function playScanSound(kind: 'success' | 'error') {
+  try {
+    const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+    const ctx = new AudioCtx()
+    const beeps = kind === 'success' ? [{ freq: 880, at: 0 }] : [{ freq: 220, at: 0 }, { freq: 220, at: 0.12 }]
+    for (const beep of beeps) {
+      const oscillator = ctx.createOscillator()
+      const gain = ctx.createGain()
+      oscillator.type = 'sine'
+      oscillator.frequency.value = beep.freq
+      gain.gain.setValueAtTime(0.15, ctx.currentTime + beep.at)
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + beep.at + 0.1)
+      oscillator.connect(gain)
+      gain.connect(ctx.destination)
+      oscillator.start(ctx.currentTime + beep.at)
+      oscillator.stop(ctx.currentTime + beep.at + 0.1)
+    }
+    setTimeout(() => ctx.close(), 400)
+  } catch {
+    // Audio isn't essential to the scan working — never let a sound failure block a sale.
+  }
+}
 
 function MetricCard({ label, value, icon: Icon, tone }: { label: string; value: string; icon: typeof ShoppingCart; tone: 'navy' | 'green' | 'orange' | 'blue' }) {
   return (
@@ -69,8 +95,11 @@ function NewSaleForm({
   const [items, setItems] = useState<ItemRow[]>([{ productId: '', quantity: '1', unitPrice: '', unit: 'sack', tonnage: '' }])
   const [scanCode, setScanCode] = useState('')
   const [scanError, setScanError] = useState('')
+  const [scanFeedback, setScanFeedback] = useState<'success' | 'error' | null>(null)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const scanInputRef = useRef<HTMLInputElement>(null)
+  const formRef = useRef<HTMLFormElement>(null)
 
   useEffect(() => {
     if (!storeId && storeOptions.length > 0) setStoreId(String(storeOptions[0].id))
@@ -98,24 +127,42 @@ function NewSaleForm({
     updateItem(index, { productId, unitPrice: product ? String(product.unitPrice) : '', unit: 'sack', tonnage: '' })
   }
 
+  function flashScanFeedback(kind: 'success' | 'error') {
+    playScanSound(kind)
+    setScanFeedback(kind)
+    window.setTimeout(() => setScanFeedback(null), 350)
+  }
+
   // A barcode scanner behaves exactly like a keyboard typing fast, then pressing Enter — so a
   // plain text input with an Enter handler is all scanning needs, no special hardware integration.
   // The scanned code only ever picks WHICH product goes in the cart; the price is still whatever
   // the catalog says (same `handleProductChange`/`productMap` path as the dropdown), never trusted
   // from the barcode itself.
+  //
+  // Pressing Enter on an EMPTY scan field submits the sale instead of looking anything up — lets a
+  // cashier finish a sale with the keyboard alone (scan items, then one more Enter) instead of
+  // reaching for the mouse to click "Enregistrer".
   function handleScan(event: React.KeyboardEvent<HTMLInputElement>) {
     if (event.key !== 'Enter') return
     event.preventDefault()
     const code = scanCode.trim()
     setScanCode('')
-    if (!code) return
+
+    if (!code) {
+      formRef.current?.requestSubmit()
+      return
+    }
 
     const product = productOptions.find((option) => option.sku.toLowerCase() === code.toLowerCase())
     if (!product) {
       setScanError(`Code-barres inconnu : ${code}`)
+      flashScanFeedback('error')
+      scanInputRef.current?.focus()
       return
     }
     setScanError('')
+    flashScanFeedback('success')
+    scanInputRef.current?.focus()
 
     setItems((rows) => {
       const sackRowIndex = rows.findIndex((row) => row.productId === String(product.id) && row.unit === 'sack')
@@ -197,7 +244,7 @@ function NewSaleForm({
   }
 
   return (
-    <form onSubmit={handleSubmit}>
+    <form ref={formRef} onSubmit={handleSubmit}>
       {error && <p className="form-error">{error}</p>}
       <div className="form-row">
         <div className="form-field">
@@ -240,11 +287,17 @@ function NewSaleForm({
       <div className="form-field">
         <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}><ScanLine size={14} /> Scanner un code-barres</label>
         <input
+          ref={scanInputRef}
           autoFocus
           value={scanCode}
           onChange={(event) => setScanCode(event.target.value)}
           onKeyDown={handleScan}
-          placeholder="Scannez ou tapez un code-barres puis Entrée"
+          placeholder="Scannez ou tapez un code-barres puis Entrée · Entrée à vide = valider la vente"
+          style={{
+            transition: 'background-color .15s, border-color .15s',
+            backgroundColor: scanFeedback === 'success' ? 'var(--tint-green, #e6f7ea)' : scanFeedback === 'error' ? 'var(--tint-red, #fbe9e8)' : undefined,
+            borderColor: scanFeedback === 'success' ? 'var(--green, #2e9e3f)' : scanFeedback === 'error' ? 'var(--red, #d1453d)' : undefined,
+          }}
         />
         {scanError && <p className="form-error" style={{ marginTop: 4 }}>{scanError}</p>}
       </div>
