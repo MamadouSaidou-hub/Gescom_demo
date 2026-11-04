@@ -281,13 +281,14 @@ function NewSaleForm({
           value={scanCode}
           onChange={(event) => setScanCode(event.target.value)}
           onKeyDown={handleScan}
-          placeholder="Scannez ou tapez un code-barres puis Entrée · Entrée à vide = valider la vente"
+          placeholder="Code-barres puis Entrée"
           style={{
             transition: 'background-color .15s, border-color .15s',
             backgroundColor: scanFeedback === 'success' ? 'var(--tint-green, #e6f7ea)' : scanFeedback === 'error' ? 'var(--tint-red, #fbe9e8)' : undefined,
             borderColor: scanFeedback === 'success' ? 'var(--green, #2e9e3f)' : scanFeedback === 'error' ? 'var(--red, #d1453d)' : undefined,
           }}
         />
+        <p className="section-subtitle" style={{ marginTop: 4, marginBottom: 0 }}>Entrée à vide = valider la vente</p>
         {scanError && <p className="form-error" style={{ marginTop: 4 }}>{scanError}</p>}
       </div>
 
