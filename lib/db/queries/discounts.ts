@@ -1,10 +1,13 @@
 import { and, desc, eq } from 'drizzle-orm'
 import { withTenant } from '../tenant'
 import { discountApplications, discountScales, discountTiers } from '../schema'
-import { formatFcfa } from '@/lib/format'
+import { makeFormatFcfa } from '@/lib/format'
+import { getTenantBranding } from '@/lib/settings-cache'
 import { computeDiscount, currentPeriod, getSupplierCycleProgress, type PartyType } from '../mutations/discounts'
 
 export async function getDiscountScale(tenantId: number, partyType: PartyType, partyId: number) {
+  const branding = await getTenantBranding(tenantId)
+  const formatFcfa = makeFormatFcfa(branding.currency)
   // Client scales: monthly, recomputed (and upserted) live on every read — cheap and idempotent per period.
   // Supplier scales: no calendar period — read-only progress since the last granted cycle. Granting only
   // happens explicitly (a delivery crossing a tier, or the "Calculer" button), never as a GET side effect.
@@ -56,6 +59,8 @@ export async function getDiscountScale(tenantId: number, partyType: PartyType, p
 }
 
 export async function getDiscountHistory(tenantId: number, partyType: PartyType, partyId: number) {
+  const branding = await getTenantBranding(tenantId)
+  const formatFcfa = makeFormatFcfa(branding.currency)
   return withTenant(tenantId, async (tx) => {
     const [scale] = await tx
       .select()

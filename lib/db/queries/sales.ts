@@ -1,11 +1,14 @@
 import { and, desc, eq, gte } from 'drizzle-orm'
 import { withTenant } from '../tenant'
 import { clients, products, receivables, saleItems, sales, stores } from '../schema'
-import { formatFcfa } from '@/lib/format'
+import { makeFormatFcfa } from '@/lib/format'
 import { periodRange, type PeriodKey } from '@/lib/period'
 import { resolveStoreId } from './shared'
+import { getTenantBranding } from '@/lib/settings-cache'
 
 export async function getSalesList(tenantId: number, period: PeriodKey, storeName: string | null) {
+  const branding = await getTenantBranding(tenantId)
+  const formatFcfa = makeFormatFcfa(branding.currency)
   const { start } = periodRange(period)
   const storeId = await resolveStoreId(tenantId, storeName)
   const storeFilter = storeId ? eq(sales.storeId, storeId) : undefined
@@ -50,6 +53,8 @@ export async function getSalesList(tenantId: number, period: PeriodKey, storeNam
 }
 
 export async function getSaleDetail(tenantId: number, reference: string) {
+  const branding = await getTenantBranding(tenantId)
+  const formatFcfa = makeFormatFcfa(branding.currency)
   return withTenant(tenantId, async (tx) => {
     const [sale] = await tx
       .select({

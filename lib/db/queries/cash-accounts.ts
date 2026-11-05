@@ -1,10 +1,13 @@
 import { and, desc, eq, gte } from 'drizzle-orm'
 import { withTenant } from '../tenant'
 import { cashAccounts, cashMovements } from '../schema'
-import { formatFcfa } from '@/lib/format'
+import { makeFormatFcfa } from '@/lib/format'
 import { periodRange, type PeriodKey } from '@/lib/period'
+import { getTenantBranding } from '@/lib/settings-cache'
 
 export async function getCashAccountsOverview(tenantId: number, period: PeriodKey) {
+  const branding = await getTenantBranding(tenantId)
+  const formatFcfa = makeFormatFcfa(branding.currency)
   const { start } = periodRange(period)
 
   return withTenant(tenantId, async (tx) => {

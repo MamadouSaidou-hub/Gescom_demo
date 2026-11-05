@@ -1,7 +1,8 @@
 import { and, desc, eq } from 'drizzle-orm'
 import { withTenant } from '../tenant'
 import { products, stockCounts, stockLevels, stores, supplierDeliveries, suppliers } from '../schema'
-import { formatFcfa } from '@/lib/format'
+import { makeFormatFcfa } from '@/lib/format'
+import { getTenantBranding } from '@/lib/settings-cache'
 import { resolveStoreId } from './shared'
 
 const statusOf = (quantity: number, threshold: number): 'critical' | 'low' | 'ok' =>
@@ -11,6 +12,8 @@ const statusOf = (quantity: number, threshold: number): 'critical' | 'low' | 'ok
 const statusRank = { critical: 0, low: 1, ok: 2 } as const
 
 export async function getStockOverview(tenantId: number, storeName: string | null) {
+  const branding = await getTenantBranding(tenantId)
+  const formatFcfa = makeFormatFcfa(branding.currency)
   const storeId = await resolveStoreId(tenantId, storeName)
 
   return withTenant(tenantId, async (tx) => {

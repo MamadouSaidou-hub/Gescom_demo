@@ -1,9 +1,12 @@
 import { eq } from 'drizzle-orm'
 import { withTenant } from '../tenant'
 import { supplierDeliveries, supplierPayables, supplierPayments, suppliers } from '../schema'
-import { formatFcfa } from '@/lib/format'
+import { makeFormatFcfa } from '@/lib/format'
+import { getTenantBranding } from '@/lib/settings-cache'
 
 export async function getSuppliersOverview(tenantId: number) {
+  const branding = await getTenantBranding(tenantId)
+  const formatFcfa = makeFormatFcfa(branding.currency)
   return withTenant(tenantId, async (tx) => {
     const supplierRows = await tx.select().from(suppliers).where(eq(suppliers.tenantId, tenantId))
     const payableRows = await tx

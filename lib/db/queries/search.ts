@@ -1,7 +1,8 @@
 import { and, eq, ilike, or } from 'drizzle-orm'
 import { withTenant } from '../tenant'
 import { clients, products, sales, stores, suppliers } from '../schema'
-import { formatFcfa } from '@/lib/format'
+import { makeFormatFcfa } from '@/lib/format'
+import { getTenantBranding } from '@/lib/settings-cache'
 import type { SessionContext } from '@/lib/session'
 
 export type SearchResult = { type: 'product' | 'client' | 'sale' | 'supplier' | 'store'; label: string; subtitle: string; href: string }
@@ -14,6 +15,8 @@ export async function getGlobalSearch(query: string, ctx: SessionContext): Promi
   const pattern = `%${q}%`
   const isAdmin = ctx.role === 'admin'
   const tenantId = ctx.tenantId
+  const branding = await getTenantBranding(tenantId)
+  const formatFcfa = makeFormatFcfa(branding.currency)
 
   return withTenant(tenantId, async (tx) => {
     const [productRows, clientRows, saleRows, supplierRows, storeRows] = await Promise.all([

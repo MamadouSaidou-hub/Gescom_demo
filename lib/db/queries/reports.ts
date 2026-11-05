@@ -1,8 +1,9 @@
 import { and, desc, eq, gte, lt, sql } from 'drizzle-orm'
 import { withTenant } from '../tenant'
 import { clients, products, saleItems, sales, stores, supplierDeliveries, supplierPayments } from '../schema'
-import { formatFcfa } from '@/lib/format'
+import { makeFormatFcfa } from '@/lib/format'
 import { periodRange, type PeriodKey } from '@/lib/period'
+import { getTenantBranding } from '@/lib/settings-cache'
 
 const dayLabels = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam']
 
@@ -32,6 +33,8 @@ function trendBucketsFor(period: PeriodKey, start: Date, end: Date) {
 }
 
 export async function getReportsOverview(tenantId: number, period: PeriodKey) {
+  const branding = await getTenantBranding(tenantId)
+  const formatFcfa = makeFormatFcfa(branding.currency)
   const { start, end } = periodRange(period)
   const trendBuckets = trendBucketsFor(period, start, end)
 

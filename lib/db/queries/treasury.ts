@@ -1,11 +1,14 @@
 import { and, desc, eq, gte } from 'drizzle-orm'
 import { withTenant } from '../tenant'
 import { clients, payments, receivables, sales, stores, supplierPayables, supplierPayments } from '../schema'
-import { formatFcfa } from '@/lib/format'
+import { makeFormatFcfa } from '@/lib/format'
 import { periodRange, type PeriodKey } from '@/lib/period'
+import { getTenantBranding } from '@/lib/settings-cache'
 import { resolveStoreId } from './shared'
 
 export async function getTreasuryOverview(tenantId: number, period: PeriodKey, storeName: string | null) {
+  const branding = await getTenantBranding(tenantId)
+  const formatFcfa = makeFormatFcfa(branding.currency)
   const { start } = periodRange(period)
   const storeId = await resolveStoreId(tenantId, storeName)
 

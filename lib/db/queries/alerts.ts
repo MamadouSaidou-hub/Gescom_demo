@@ -1,7 +1,8 @@
 import { and, eq, ne } from 'drizzle-orm'
 import { withTenant } from '../tenant'
 import { clients, receivables, sales, suppliers, supplierPayables } from '../schema'
-import { formatFcfa } from '@/lib/format'
+import { makeFormatFcfa } from '@/lib/format'
+import { getTenantBranding } from '@/lib/settings-cache'
 
 export type DueAlert = {
   kind: 'client' | 'supplier'
@@ -20,6 +21,8 @@ function daysUntil(dueDate: string): number {
 }
 
 export async function getDueDateAlerts(tenantId: number, storeId: number | null, includeSuppliers: boolean) {
+  const branding = await getTenantBranding(tenantId)
+  const formatFcfa = makeFormatFcfa(branding.currency)
   return withTenant(tenantId, async (tx) => {
     const receivableRows = await tx
       .select({

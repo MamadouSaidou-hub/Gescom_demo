@@ -1,9 +1,10 @@
 import { and, desc, eq, gte, lt, sql } from 'drizzle-orm'
 import { withTenant } from '../tenant'
 import { clients, payments, products, receivables, sales, stockLevels, stockMovements, stores, transfers } from '../schema'
-import { formatFcfa, formatTrend, pctChange } from '@/lib/format'
+import { makeFormatFcfa, formatTrend, pctChange } from '@/lib/format'
 import { periodRange, type PeriodKey } from '@/lib/period'
 import { resolveStoreId } from './shared'
+import { getTenantBranding } from '@/lib/settings-cache'
 
 type Activity = { title: string; subtitle: string; amount: string; tone: 'green' | 'blue' | 'orange' | 'purple'; icon: 'sale' | 'stock' | 'payment' | 'transfer'; createdAt: string }
 
@@ -18,6 +19,8 @@ function relativeTime(iso: string) {
 }
 
 export async function getDashboardData(tenantId: number, period: PeriodKey, storeName: string | null) {
+  const branding = await getTenantBranding(tenantId)
+  const formatFcfa = makeFormatFcfa(branding.currency)
   const { start, previousStart } = periodRange(period)
   const storeId = await resolveStoreId(tenantId, storeName)
   const storeFilter = storeId ? eq(sales.storeId, storeId) : undefined
