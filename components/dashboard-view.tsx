@@ -19,7 +19,7 @@ import { fetchJson } from '@/lib/fetch-json'
 import { useSettings } from '@/components/settings-provider'
 import { authClient } from '@/lib/auth-client'
 
-const periods = ['Aujourd’hui', '7 derniers jours', 'Ce mois-ci']
+const periods = ['Aujourd’hui', '7 derniers jours', 'Ce mois-ci', 'Cette année']
 
 type Metric = { value: string; helper: string; trend: string }
 type DueAlert = { kind: 'client' | 'supplier'; name: string; amount: string; dueDate: string; daysUntilDue: number }
@@ -27,6 +27,7 @@ type DashboardData = {
   stores: string[]
   metrics: { revenue: Metric; margin?: Metric; lowStock: Metric; receivables: Metric }
   salesTrend: { day: string; value: number }[]
+  salesTrendChange: string
   storePerformance: { name: string; amount: number; pct: number }[]
   activity: { title: string; subtitle: string; amount: string; tone: 'green' | 'blue' | 'orange' | 'purple'; icon: 'sale' | 'stock' | 'payment' | 'transfer' }[]
   alerts: { title: string; subtitle: string; tone: 'orange' | 'blue' | 'green' }[]
@@ -124,7 +125,7 @@ export function DashboardView() {
             <div className="chart-y"><span>{Math.round(maxSales / 1000)}K</span><span>{Math.round((maxSales * 0.66) / 1000)}K</span><span>{Math.round((maxSales * 0.33) / 1000)}K</span><span>0</span></div>
             <div className="bar-chart">{sales.map((item) => <div className="bar-group" key={item.day}><div className="bar-track"><div className="bar" style={{ height: `${(item.value / maxSales) * 100}%` }} /></div><span>{item.day}</span></div>)}</div>
           </div>
-          <div className="chart-total"><strong>{loading ? '…' : `${(totalPeriodRevenue / 1_000_000).toFixed(2)}M ${currency}`}</strong><span><ArrowUpRight /> {data?.metrics.revenue.trend ?? ''} vs période précédente</span></div>
+          <div className="chart-total"><strong>{loading ? '…' : `${(totalPeriodRevenue / 1_000_000).toFixed(2)}M ${currency}`}</strong><span><ArrowUpRight /> {data?.salesTrendChange ?? ''} vs période précédente</span></div>
         </article>
         <article className="panel store-panel">
           <div className="panel-header"><div><h2>Performance magasins</h2><p>Répartition du chiffre d’affaires</p></div><button className="more-button" aria-label="Plus d'options">•••</button></div>

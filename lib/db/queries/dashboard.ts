@@ -2,7 +2,7 @@ import { and, desc, eq, gte, lt, sql } from 'drizzle-orm'
 import { withTenant } from '../tenant'
 import { clients, payments, products, receivables, sales, stockLevels, stockMovements, stores, transfers } from '../schema'
 import { makeFormatFcfa, formatTrend, pctChange } from '@/lib/format'
-import { periodRange, type PeriodKey } from '@/lib/period'
+import { periodRange, periodTrendBuckets, type PeriodKey } from '@/lib/period'
 import { resolveStoreId } from './shared'
 import { getTenantBranding } from '@/lib/settings-cache'
 
@@ -21,20 +21,16 @@ function relativeTime(iso: string) {
 export async function getDashboardData(tenantId: number, period: PeriodKey, storeName: string | null) {
   const branding = await getTenantBranding(tenantId)
   const formatFcfa = makeFormatFcfa(branding.currency)
-  const { start, previousStart } = periodRange(period)
+  const { start, previousStart, end } = periodRange(period)
   const storeId = await resolveStoreId(tenantId, storeName)
   const storeFilter = storeId ? eq(sales.storeId, storeId) : undefined
   const stockFilter = storeId ? eq(stockLevels.storeId, storeId) : undefined
 
-  const dayLabels = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam']
-  const dayRanges = Array.from({ length: 7 }, (_, index) => {
-    const dayStart = new Date()
-    dayStart.setHours(0, 0, 0, 0)
-    dayStart.setDate(dayStart.getDate() - (6 - index))
-    const dayEnd = new Date(dayStart)
-    dayEnd.setDate(dayEnd.getDate() + 1)
-    return { dayStart, dayEnd }
-  })
+  // The "Évolution des ventes" chart now follows the selected period exactly (hour buckets for
+  // "today", daily for "7 derniers jours"/"ce mois-ci", monthly for "cette année") — its total is
+  // therefore always exactly `revenue` below, and its trend is always exactly the same comparison
+  // against `previousStart`, so no separate query/number is needed for either.
+  const trendBuckets = periodTrendBuckets(period, start, end)
 
   return withTenant(tenantId, async (tx) => {
     // All of the following are independent reads — running them concurrently instead of one `await` at a
@@ -86,19 +82,19 @@ export async function getDashboardData(tenantId: number, period: PeriodKey, stor
             : and(eq(receivables.status, 'overdue'), eq(receivables.tenantId, tenantId)),
         ),
       Promise.all(
-        dayRanges.map(({ dayStart, dayEnd }) =>
+        trendBuckets.map(({ bucketStart, bucketEnd, label }) =>
           tx
             .select({ total: sales.totalAmount })
             .from(sales)
             .where(
               and(
-                gte(sales.createdAt, dayStart.toISOString()),
-                lt(sales.createdAt, dayEnd.toISOString()),
+                gte(sales.createdAt, bucketStart.toISOString()),
+                lt(sales.createdAt, bucketEnd.toISOString()),
                 eq(sales.tenantId, tenantId),
                 storeFilter,
               ),
             )
-            .then((rows) => ({ day: dayLabels[dayStart.getDay()], value: rows.reduce((sum, row) => sum + row.total, 0) })),
+            .then((rows) => ({ day: label, value: rows.reduce((sum, row) => sum + row.total, 0) })),
         ),
       ),
       tx
@@ -271,6 +267,7 @@ export async function getDashboardData(tenantId: number, period: PeriodKey, stor
         receivables: { value: formatFcfa(totalReceivables), helper: `${distinctClients} clients en retard`, trend: '' },
       },
       salesTrend,
+      salesTrendChange: formatTrend(pctChange(revenue, previousRevenue)),
       storePerformance,
       activity: activity.slice(0, 4),
       alerts: alerts.slice(0, 3),
