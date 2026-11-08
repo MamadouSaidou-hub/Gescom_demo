@@ -2,7 +2,7 @@ import { and, desc, eq, gte, lt, sql } from 'drizzle-orm'
 import { withTenant } from '../tenant'
 import { clients, payments, products, receivables, sales, stockLevels, stockMovements, stores, transfers } from '../schema'
 import { makeFormatFcfa, formatTrend, pctChange } from '@/lib/format'
-import { periodRange, periodTrendBuckets, type PeriodKey } from '@/lib/period'
+import { periodRange, periodTrendBuckets, type CustomRange, type PeriodKey } from '@/lib/period'
 import { resolveStoreId } from './shared'
 import { getTenantBranding } from '@/lib/settings-cache'
 
@@ -18,19 +18,18 @@ function relativeTime(iso: string) {
   return `Il y a ${days} j`
 }
 
-export async function getDashboardData(tenantId: number, period: PeriodKey, storeName: string | null) {
+export async function getDashboardData(tenantId: number, period: PeriodKey, storeName: string | null, custom?: CustomRange) {
   const branding = await getTenantBranding(tenantId)
   const formatFcfa = makeFormatFcfa(branding.currency)
-  const { start, previousStart, end } = periodRange(period)
+  const { start, previousStart, end } = periodRange(period, custom)
   const storeId = await resolveStoreId(tenantId, storeName)
   const storeFilter = storeId ? eq(sales.storeId, storeId) : undefined
   const stockFilter = storeId ? eq(stockLevels.storeId, storeId) : undefined
 
-  // The "Évolution des ventes" chart now follows the selected period exactly (hour buckets for
-  // "today", daily for "7 derniers jours"/"ce mois-ci", monthly for "cette année") — its total is
-  // therefore always exactly `revenue` below, and its trend is always exactly the same comparison
-  // against `previousStart`, so no separate query/number is needed for either.
-  const trendBuckets = periodTrendBuckets(period, start, end)
+  // The "Évolution des ventes" chart now follows the selected period exactly (granularity derived
+  // from the span's length) — its total is therefore always exactly `revenue` below, and its trend
+  // is always exactly the same comparison against `previousStart`, so no separate query is needed.
+  const trendBuckets = periodTrendBuckets(start, end)
 
   return withTenant(tenantId, async (tx) => {
     // All of the following are independent reads — running them concurrently instead of one `await` at a
