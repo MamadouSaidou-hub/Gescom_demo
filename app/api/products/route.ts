@@ -10,8 +10,15 @@ export async function GET() {
   const ctx = await getSessionContext()
   if (!ctx) return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 })
 
+  // costPrice (purchase price) deliberately excluded — every consumer of this list (sale/transfer/
+  // delivery forms) only ever needs id/name/sku/unitPrice/unitSingular/unitPlural, and a gestionnaire
+  // without the "products" permission isn't meant to see cost price or derive margin from it.
   const rows = await withTenant(ctx.tenantId, async (tx) =>
-    tx.select().from(products).where(eq(products.tenantId, ctx.tenantId)).orderBy(products.name),
+    tx
+      .select({ id: products.id, name: products.name, sku: products.sku, category: products.category, unitPrice: products.unitPrice, reorderThreshold: products.reorderThreshold, unitSingular: products.unitSingular, unitPlural: products.unitPlural })
+      .from(products)
+      .where(eq(products.tenantId, ctx.tenantId))
+      .orderBy(products.name),
   )
   return NextResponse.json({ products: rows })
 }
