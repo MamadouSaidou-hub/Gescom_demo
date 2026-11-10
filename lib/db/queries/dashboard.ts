@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, lt, sql } from 'drizzle-orm'
+import { and, desc, eq, gte, lt, or, sql } from 'drizzle-orm'
 import { withTenant } from '../tenant'
 import { clients, payments, products, receivables, sales, stockLevels, stockMovements, stores, transfers } from '../schema'
 import { makeFormatFcfa, formatTrend, pctChange } from '@/lib/format'
@@ -104,7 +104,7 @@ export async function getDashboardData(tenantId: number, period: PeriodKey, stor
         })
         .from(sales)
         .innerJoin(stores, eq(sales.storeId, stores.id))
-        .where(and(gte(sales.createdAt, start.toISOString()), eq(sales.tenantId, tenantId)))
+        .where(and(gte(sales.createdAt, start.toISOString()), eq(sales.tenantId, tenantId), storeFilter))
         .groupBy(sales.storeId, stores.name),
       tx
         .select({
@@ -151,13 +151,21 @@ export async function getDashboardData(tenantId: number, period: PeriodKey, stor
         })
         .from(transfers)
         .innerJoin(stores, eq(transfers.fromStoreId, stores.id))
-        .where(eq(transfers.tenantId, tenantId))
+        .where(
+          storeId
+            ? and(eq(transfers.tenantId, tenantId), or(eq(transfers.fromStoreId, storeId), eq(transfers.toStoreId, storeId)))
+            : eq(transfers.tenantId, tenantId),
+        )
         .orderBy(desc(transfers.createdAt))
         .limit(1),
       tx
         .select({ reference: transfers.reference, toStoreId: transfers.toStoreId })
         .from(transfers)
-        .where(and(eq(transfers.status, 'in_transit'), eq(transfers.tenantId, tenantId)))
+        .where(
+          storeId
+            ? and(eq(transfers.status, 'in_transit'), eq(transfers.tenantId, tenantId), or(eq(transfers.fromStoreId, storeId), eq(transfers.toStoreId, storeId)))
+            : and(eq(transfers.status, 'in_transit'), eq(transfers.tenantId, tenantId)),
+        )
         .limit(1),
     ])
 
